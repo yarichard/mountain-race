@@ -1,0 +1,8 @@
+node_modules/
+frontend/.next/
+frontend/out/
+backend/bin/
+.env
+*.pdf
+*.code-workspace
+.vscode

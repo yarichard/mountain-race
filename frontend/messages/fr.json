@@ -1,0 +1,102 @@
+{
+  "app": {
+    "title": "Mountain Race"
+  },
+  "participants": {
+    "title": "Participants",
+    "add": "Ajouter",
+    "name": "Nom",
+    "level": "Niveau",
+    "remove": "Supprimer"
+  },
+  "objectives": {
+    "title": "Objectifs",
+    "challenge": "Challenge",
+    "fun": "Plaisir",
+    "performance": "Performance",
+    "discovery": "Découverte",
+    "notes": "Notes libres"
+  },
+  "weather": {
+    "title": "Météo",
+    "empty": "Sélectionnez une course pour voir la météo",
+    "tempMin": "T° min",
+    "tempMax": "T° max",
+    "precipitation": "Précipitations",
+    "wind": "Vent",
+    "avalanche": "Risque avalanche",
+    "condition": {
+      "sunny": "Ensoleillé",
+      "partly_cloudy": "Partiellement nuageux",
+      "cloudy": "Nuageux",
+      "rain": "Pluie",
+      "snow": "Neige",
+      "storm": "Orage"
+    }
+  },
+  "search": {
+    "title": "Recherche",
+    "date": "Date",
+    "raceType": "Type de course",
+    "difficulty": "Difficulté",
+    "location": "Lieu",
+    "locationPlaceholder": "ex: Aiguille du Midi",
+    "locationPlaceholderGeo": "ex: Chamonix, ou 45.9,6.9",
+    "locationMode": {
+      "name": "Nom",
+      "location": "Lieu"
+    },
+    "search": "Rechercher",
+    "searching": "Recherche...",
+    "results": "Résultats",
+    "noResults": "Aucune course trouvée",
+    "selectRoute": "Sélectionner",
+    "elevationGain": "Dénivelé",
+    "distance": "Distance",
+    "raceTypes": {
+      "multipitch": "Escalade (multi-longueurs)",
+      "ridge_hike": "Randonnée sur arête",
+      "hike": "Randonnée"
+    }
+  },
+  "detail": {
+    "title": "Itinéraire",
+    "empty": "Sélectionnez une course pour voir le détail",
+    "map": "Carte",
+    "elevation": "Profil altimétrique",
+    "topo": "Topo / Description",
+    "pitchNumber": "Longueur",
+    "grade": "Cotation",
+    "description": "Description",
+    "viewOnC2C": "Voir sur CampToCamp"
+  },
+  "risks": {
+    "title": "Risques & Vigilance",
+    "empty": "Sélectionnez une course pour voir les risques"
+  },
+  "alternatives": {
+    "title": "Itinéraires alternatifs",
+    "empty": "Aucun itinéraire alternatif",
+    "viewOnC2C": "Voir"
+  },
+  "schedule": {
+    "title": "Horaire",
+    "empty": "Sélectionnez une course pour voir l'horaire",
+    "duration": "Durée estimée",
+    "start": "Départ conseillé",
+    "end": "Retour conseillé",
+    "hours": "h",
+    "naissmithNotice": "Durée estimée par la règle de Naismith (aucune donnée disponible sur CampToCamp)"
+  },
+  "equipment": {
+    "title": "Matériel",
+    "empty": "Sélectionnez une course pour voir le matériel",
+    "item": "Item",
+    "quantity": "Quantité",
+    "notes": "Notes"
+  },
+  "export": {
+    "button": "Exporter en PDF",
+    "exporting": "Export..."
+  }
+}

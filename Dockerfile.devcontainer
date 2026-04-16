@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+
+FROM mcr.microsoft.com/devcontainers/go:latest
+
+# Install node and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get update \
+    && apt-get install -y \
+        nodejs \
+        libeccodes-dev \
+        chromium \
+    && npm install -g npm@latest \
+    && rm -rf /var/lib/apt/lists/*
+
+USER vscode
+
+# Install Claude Code
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
+WORKDIR /workspaces/mountain-race
+
+CMD ["/bin/sh", "-c", "while sleep 1000; do :; done"]

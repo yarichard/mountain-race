@@ -1,0 +1,27 @@
+{
+    "name": "Mountain Race Development Environment",
+    "dockerFile": "Dockerfile.devcontainer",
+
+    "mounts": [
+        "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind"
+    ],
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "mhutchie.git-graph",
+                "postman.postman-for-vscode",
+                "alexcvzz.vscode-sqlite",
+                "anthropic.claude-code"
+            ]
+        }
+    },
+    "containerEnv": {
+        "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/go:1": {}
+        //"ghcr.io/anthropics/devcontainer-features/claude-code:latest": {}
+    },
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
+}

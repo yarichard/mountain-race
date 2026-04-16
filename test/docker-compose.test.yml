@@ -1,0 +1,24 @@
+services:
+  app:
+    image: mountain-race
+    ports:
+      - "8003:8003"
+    env_file:
+      - ../.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.44.0-jammy
+    working_dir: /tests
+    volumes:
+      - .:/tests
+    depends_on:
+      app:
+        condition: service_healthy
+    command: npx playwright test
+    environment:
+      - BASE_URL=http://app:8003

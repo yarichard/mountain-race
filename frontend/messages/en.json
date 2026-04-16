@@ -1,0 +1,102 @@
+{
+  "app": {
+    "title": "Mountain Race"
+  },
+  "participants": {
+    "title": "Participants",
+    "add": "Add",
+    "name": "Name",
+    "level": "Level",
+    "remove": "Remove"
+  },
+  "objectives": {
+    "title": "Objectives",
+    "challenge": "Challenge",
+    "fun": "Fun",
+    "performance": "Performance",
+    "discovery": "Discovery",
+    "notes": "Additional notes"
+  },
+  "weather": {
+    "title": "Weather",
+    "empty": "Select a route to see weather",
+    "tempMin": "Min temp",
+    "tempMax": "Max temp",
+    "precipitation": "Precipitation",
+    "wind": "Wind",
+    "avalanche": "Avalanche risk",
+    "condition": {
+      "sunny": "Sunny",
+      "partly_cloudy": "Partly cloudy",
+      "cloudy": "Cloudy",
+      "rain": "Rain",
+      "snow": "Snow",
+      "storm": "Storm"
+    }
+  },
+  "search": {
+    "title": "Search",
+    "date": "Date",
+    "raceType": "Race type",
+    "difficulty": "Difficulty",
+    "location": "Location",
+    "locationPlaceholder": "e.g. Aiguille du Midi",
+    "locationPlaceholderGeo": "e.g. Chamonix, or 45.9,6.9",
+    "locationMode": {
+      "name": "Name",
+      "location": "Area"
+    },
+    "search": "Search",
+    "searching": "Searching...",
+    "results": "Results",
+    "noResults": "No routes found",
+    "selectRoute": "Select",
+    "elevationGain": "Elevation gain",
+    "distance": "Distance",
+    "raceTypes": {
+      "multipitch": "Multi-pitch climbing",
+      "ridge_hike": "Ridge hike",
+      "hike": "Hike"
+    }
+  },
+  "detail": {
+    "title": "Route detail",
+    "empty": "Select a route to see details",
+    "map": "Map",
+    "elevation": "Elevation profile",
+    "topo": "Topo / Description",
+    "pitchNumber": "Pitch",
+    "grade": "Grade",
+    "description": "Description",
+    "viewOnC2C": "View on CampToCamp"
+  },
+  "risks": {
+    "title": "Risks & Caution",
+    "empty": "Select a route to see risks"
+  },
+  "alternatives": {
+    "title": "Alternative routes",
+    "empty": "No alternative routes",
+    "viewOnC2C": "View"
+  },
+  "schedule": {
+    "title": "Schedule",
+    "empty": "Select a route to see the schedule",
+    "duration": "Estimated duration",
+    "start": "Recommended start",
+    "end": "Recommended end",
+    "hours": "h",
+    "naissmithNotice": "Duration estimated using Naismith's rule (no data available on CampToCamp)"
+  },
+  "equipment": {
+    "title": "Equipment",
+    "empty": "Select a route to see equipment",
+    "item": "Item",
+    "quantity": "Quantity",
+    "notes": "Notes"
+  },
+  "export": {
+    "button": "Export to PDF",
+    "exporting": "Exporting..."
+  }
+}

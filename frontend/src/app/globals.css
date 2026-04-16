@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #1F2782;
+  --primary-light: #2d3ba0;
+  --surface: #ffffff;
+  --surface-alt: #f0f2ff;
+  --border: #c8cde8;
+  --text: #1a1a2e;
+  --text-muted: #6b7280;
+  --font-sans: var(--font-geist);
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-border: var(--border);
+  --font-sans: var(--font-geist);
+}
+
+body {
+  background: var(--surface-alt);
+  color: var(--text);
+  font-family: var(--font-sans, Arial, sans-serif);
+}
+
+/* Mountain-themed scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface-alt); }
+::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
+
+/* Card panels */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(31,39,130,0.07);
+  overflow: hidden;
+}
+
+.panel-header {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+}
+
+.panel-body {
+  padding: 12px 14px;
+}
+
+/* Inputs */
+input, select, textarea {
+  font-family: inherit;
+}
