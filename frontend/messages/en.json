@@ -20,6 +20,7 @@
   "weather": {
     "title": "Weather",
     "empty": "Select a route to see weather",
+    "error": "Weather unavailable",
     "tempMin": "Min temp",
     "tempMax": "Max temp",
     "precipitation": "Precipitation",

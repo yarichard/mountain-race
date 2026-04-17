@@ -6,7 +6,7 @@ import { MULTIPITCH_GRADES, ALPINE_GRADES, type RaceType, type RouteResult, type
 
 interface Props {
   participants: Participant[];
-  onRouteSelected: (id: string) => void;
+  onRouteSelected: (id: string, date: string) => void;
 }
 
 export function SearchPanel({ participants, onRouteSelected }: Props) {
@@ -153,7 +153,7 @@ export function SearchPanel({ participants, onRouteSelected }: Props) {
                   <div
                     key={r.id}
                     className="border border-[var(--border)] rounded p-2 hover:border-[var(--primary)] hover:bg-[var(--surface-alt)] cursor-pointer transition"
-                    onClick={() => { onRouteSelected(r.id); setResults(null); }}
+                    onClick={() => { onRouteSelected(r.id, date); setResults(null); }}
                   >
                     <div className="flex justify-between items-start gap-2">
                       <p className="text-sm font-medium leading-tight flex-1">{r.title}</p>

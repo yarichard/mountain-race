@@ -23,16 +23,25 @@ export default function Home() {
   const [notes, setNotes] = useState("");
   const [route, setRoute] = useState<RouteDetail | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherError, setWeatherError] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const handleRouteSelected = async (id: string) => {
-    const today = new Date().toISOString().split("T")[0];
-    const [routeRes, weatherRes] = await Promise.all([
-      fetch(`/api/routes/${id}`),
-      fetch(`/api/weather?lat=45.9&lon=6.9&date=${today}`),
-    ]);
-    if (routeRes.ok) setRoute(await routeRes.json());
-    if (weatherRes.ok) setWeather(await weatherRes.json());
+  const handleRouteSelected = async (id: string, date: string) => {
+    const routeRes = await fetch(`/api/routes/${id}`);
+    if (!routeRes.ok) return;
+    const routeData = await routeRes.json();
+    setRoute(routeData);
+
+    setWeather(null);
+    setWeatherError(false);
+    const lat = routeData.lat ?? 45.9;
+    const lon = routeData.lon ?? 6.9;
+    const weatherRes = await fetch(`/api/weather?lat=${lat}&lon=${lon}&date=${date}`);
+    if (weatherRes.ok) {
+      setWeather(await weatherRes.json());
+    } else {
+      setWeatherError(true);
+    }
   };
 
   const handleExport = async () => {
@@ -135,7 +144,7 @@ export default function Home() {
 
         {/* Part 3: Weather — col 3, row 1 */}
         <div style={{ gridArea: "p3" }} className="min-h-0">
-          <WeatherPanel weather={weather} />
+          <WeatherPanel weather={weather} error={weatherError} />
         </div>
 
         {/* Part 6: Risks — col 3, rows 2-4 */}

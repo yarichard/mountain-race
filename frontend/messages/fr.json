@@ -20,6 +20,7 @@
   "weather": {
     "title": "Météo",
     "empty": "Sélectionnez une course pour voir la météo",
+    "error": "Météo indisponible",
     "tempMin": "T° min",
     "tempMax": "T° max",
     "precipitation": "Précipitations",

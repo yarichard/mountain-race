@@ -11,7 +11,7 @@ All steps must be validated inside the Docker container (port 8003). Nothing is 
 | Phase | Description | Status |
 |---|---|---|
 | 1 | Project scaffolding | ✅ Done |
-| 2 | Backend | ✅ Done (weather GRIB2 pending — see note) |
+| 2 | Backend | ✅ Done |
 | 3 | Frontend | ✅ Done |
 | 4 | Integration & Docker build | ✅ Done |
 | 5 | E2E tests | ⬜ Not started |
@@ -91,9 +91,9 @@ backend/
 - `alternative_routes` always serialises as `[]` (never JSON `null`) to avoid frontend crashes
 - Test infrastructure: `baseURL` and `nominatimBaseURL` are package-level `var`s, overridden in unit tests via `httptest.Server`
 
-### Step 2.4 — MeteoFrance integration 🔄
+### Step 2.4 — MeteoFrance integration ✅
 - **Token** (`meteo/token.go`): real implementation, caches Bearer token in memory
-- **Weather forecast** (`meteo/forecast.go`): **STUB** — returns mock data. GRIB2 decoding with `eccodes-go` not yet implemented. The Dockerfile installs `libeccodes-dev`. TODO: implement using `github.com/meteocima/eccodes-go` CGO bindings.
+- **Weather forecast** (`meteo/forecast.go`): real WCS GetCapabilities + GetCoverage calls; GRIB2 decoded with `github.com/nilsmagnus/grib` (pure Go, no CGO). Selects AROME (≤48 h) or ARPEGE (>48 h). Returns temperature, precipitation, wind, derived condition.
 - **Avalanche bulletin** (`meteo/avalanche.go`): calls real DPBRA API; falls back to mock on failure
 
 ### Step 2.5 — Schedule computation ✅
@@ -217,9 +217,9 @@ Two services:
 | No mock fallbacks in production backend code | ✅ |
 | `alternative_routes` never serialises as null | ✅ |
 | Map uses real GPS coordinates from C2C | ✅ |
-| Weather uses route GPS (not hardcoded) | ⬜ TODO: page.tsx still passes hardcoded `lat=45.9&lon=6.9` to `/api/weather`; should use route lat/lon |
+| Weather uses route GPS (not hardcoded) | ✅ page.tsx fetches route first then calls `/api/weather` with route `lat`/`lon` and search date |
 | Elevation profile uses real GPX data | ⬜ TODO: currently synthetic (Naismith-shaped curve); needs GPX decoding |
-| GRIB2 weather decoding | ⬜ TODO: `meteo/forecast.go` returns mock; implement with `eccodes-go` |
+| GRIB2 weather decoding | ✅ implemented with `nilsmagnus/grib` (pure Go) |
 | Frontend unit tests (React Testing Library) | ⬜ |
 | E2E tests (Playwright) | ⬜ |
 | Responsive tablet layout | 🔄 Desktop-first implemented; tablet stacking not tested |
@@ -228,10 +228,6 @@ Two services:
 
 ## Known Limitations & TODOs
 
-1. **GRIB2 forecast** (`backend/meteo/forecast.go`): stub returning mock data. Real implementation needs `github.com/meteocima/eccodes-go` CGO bindings + `libeccodes-dev` already installed in the Docker image.
+1. **Elevation profile is synthetic**: `DetailPanel.tsx` generates a bell-curve profile from elevation gain and distance. Real GPX track decoding is not yet implemented.
 
-2. **Weather API call uses hardcoded coordinates**: `page.tsx` calls `/api/weather?lat=45.9&lon=6.9`. Should pass the selected route's `lat`/`lon` instead.
-
-3. **Elevation profile is synthetic**: `DetailPanel.tsx` generates a bell-curve profile from elevation gain and distance. Real GPX track decoding is not yet implemented.
-
-4. **Nominatim rate limiting**: production use should cache geocoding results or use a self-hosted instance to avoid Nominatim's 1 req/s limit.
+2. **Nominatim rate limiting**: production use should cache geocoding results or use a self-hosted instance to avoid Nominatim's 1 req/s limit.

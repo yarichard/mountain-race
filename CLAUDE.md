@@ -273,7 +273,8 @@ Layout:
 
 ### Technical Notes
 
-- **GRIB2 decoding**: AROME and ARPEGE return forecast data as GRIB2 binary files. The Go backend decodes them using `github.com/meteocima/eccodes-go` (CGO bindings to the eccodes C library). The `eccodes` C library must be installed in the Docker image. No subprocess shelling-out.
+- **GRIB2 decoding**: AROME and ARPEGE return forecast data as GRIB2 binary files. The Go backend decodes them with a **pure-Go implementation** (no CGO, no eccodes) in `backend/meteo/forecast.go`. It implements WMO GRIB2 Template 5.0 (simple packing) directly. Key layout: Section 0 is 16 bytes — bytes 0–3 `"GRIB"`, bytes 4–5 reserved, byte 6 discipline (0 = Meteorological), byte 7 edition (2 = GRIB2), bytes 8–15 total length. BinaryScale and DecimalScale in Section 5 are signed `int16` (not `uint16`; misreading as unsigned causes overflow to `+Inf` for negative scales).
+- **WCS coverage semantics**: Each MeteoFrance WCS `CoverageId` encodes exactly **one valid time** (the timestamp suffix `___YYYY-MM-DDTHH.MM.SSZ`). The `subset=time(...)` parameter in GetCoverage must match the coverage's own timestamp exactly — it is not a filter across a multi-step run. To fetch a forecast for a given target time, select the coverage whose timestamp is closest to the target (within ±24 h) and use that coverage's timestamp in `subset=time(...)`.
 - **Model selection**: use AROME (2.5 km resolution, max +48 h) for race dates within 2 days of today; use ARPEGE (global model, up to +4 days) for dates beyond that.
 
 ---
@@ -289,7 +290,7 @@ Stage 1: golang:1.26.2
 
 Stage 2: node:24-slim
   - Install Chromium (for PDF export via headless browser)
-  - Install eccodes (ECMWF library for GRIB2 decoding of AROME/ARPEGE forecast files)
+  - No eccodes needed (GRIB2 decoding is pure-Go, no CGO)
   - Copy frontend/
   - npm install && npm run build (produces static export into out/)
   - Copy Go binary from Stage 1

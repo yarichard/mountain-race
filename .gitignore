@@ -6,3 +6,5 @@ backend/bin/
 *.pdf
 *.code-workspace
 .vscode
+.DS_Store
+backend/static/

@@ -5,6 +5,7 @@ import type { WeatherData } from "@/lib/types";
 
 interface Props {
   weather: WeatherData | null;
+  error?: boolean;
 }
 
 const RISK_COLORS = ["", "text-green-600", "text-lime-600", "text-orange-500", "text-red-600", "text-black font-bold"];
@@ -19,15 +20,15 @@ const CONDITION_ICONS: Record<string, string> = {
   storm: "⛈️",
 };
 
-export function WeatherPanel({ weather }: Props) {
+export function WeatherPanel({ weather, error }: Props) {
   const t = useTranslations("weather");
 
   if (!weather) {
     return (
       <div className="panel flex flex-col h-full">
         <div className="panel-header">{t("title")}</div>
-        <div className="panel-body flex-1 flex items-center justify-center text-sm text-[var(--text-muted)] text-center">
-          {t("empty")}
+        <div className={`panel-body flex-1 flex items-center justify-center text-sm text-center ${error ? "text-red-600" : "text-[var(--text-muted)]"}`}>
+          {error ? t("error") : t("empty")}
         </div>
       </div>
     );
