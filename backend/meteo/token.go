@@ -45,7 +45,7 @@ func Token() (string, error) {
 	req.SetBasicAuth(user, pass)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("token request: %w", err)
 	}

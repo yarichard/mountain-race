@@ -52,11 +52,10 @@ In order to find a race that matches the user inputs, the backend should look fo
 - CampToCamp website (`https://www.camptocamp.org`): use the user's desired location, the group's climbing grade, and the race type via the CampToCamp API. As there is no official API, rely on the github repo `https://github.com/c2corg/v6_api` which contains the API code. Access is anonymous read-only (no credentials required). All climbing grades returned must be in the French grading format.
 
 ### Getting weather informations ###
-In order to get weather information related to the race, the backend should use the following MeteoFrance APIs. Both require a Bearer token obtained by POSTing HTTP Basic Auth (METEOFRANCE_USER / METEOFRANCE_PASS) to `https://portail-api.meteofrance.fr/token`.
 
-- **Point weather forecast**: Use the MeteoFrance **AROME** API (`https://public-api.meteofrance.fr/public/arome/1.0`) if race is scheduled within 48 hours, or **ARPEGE** (`https://public-api.meteofrance.fr/public/arpege/1.0`) if not. Use it to retrieve the grib2 file content, and get the forecast data (temperature, rain, isotherm, ...)
+- **Point weather forecast**: Use the **Open-Meteo** API (`https://api.open-meteo.com/v1/forecast`) with hourly variables `wind_speed_10m` and `precipitation`. For race dates **within 4 days**, use `models=meteofrance_seamless` and `temperature_100m`. For dates **beyond 4 days**, omit the `models` parameter (basic global API) and use `temperature_120m` instead. Always pass `timezone=UTC` and set both `start_date` and `end_date` to the race date. No authentication required.
 
-- **Avalanche forecast**: Use the MeteoFrance **DPBRA** API (`https://public-api.meteofrance.fr/public/DPBRA/v1`) to retrieve the Bulletin de Risque d'Avalanche for the relevant massif.
+- **Avalanche forecast**: Use the MeteoFrance **DPBRA** API (`https://public-api.meteofrance.fr/public/DPBRA/v1`) to retrieve the Bulletin de Risque d'Avalanche for the relevant massif. Requires a Bearer token obtained by POSTing HTTP Basic Auth (METEOFRANCE_USER / METEOFRANCE_PASS) to `https://portail-api.meteofrance.fr/token`.
 
 ### Visual Design
 
@@ -117,8 +116,8 @@ mountain-race/
 ---
 
 ## 5. Environment Variables
-- **METEOFRANCE_USER**: MeteoFrance API username, used to generate a Bearer token
-- **METEOFRANCE_PASS**: MeteoFrance API password, used to generate a Bearer token
+- **METEOFRANCE_USER**: MeteoFrance API username, used to generate a Bearer token for the avalanche (DPBRA) API
+- **METEOFRANCE_PASS**: MeteoFrance API password, used to generate a Bearer token for the avalanche (DPBRA) API
 
 ### Behavior
 
@@ -226,10 +225,24 @@ Fetch weather forecast and avalanche risk for a location and date.
   "avalanche": {
     "risk_level": 0,              // 1–5 European scale
     "risk_label": "string",       // e.g. "Limité"
-    "description": "string"
-  }
+    "description": "string",
+    "massif_id": 0,               // DPBRA massif code; 0 when unavailable (mock fallback)
+    "massif_name": "string"       // human-readable massif name
+  },
+  "hourly": [                     // 24 hourly points for the race date
+    { "hour": 0, "temperature_c": 0.0, "wind_speed_kmh": 0.0 }
+  ]
 }
 ```
+
+---
+
+#### `GET /api/avalanche/image`
+Proxy a DPBRA massif image through the backend (required because the MeteoFrance API needs a Bearer token).
+
+**Query params:** `massif_id` (integer), `type` (one of `montagne-risques`, `apercu-meteo`, `sept-derniers-jours`)
+
+**Response `200`:** image binary (`Content-Type` forwarded from DPBRA)
 
 ---
 
@@ -249,7 +262,7 @@ All the user experience is displayed on a single page divided into 9 parts. Part
 Parts:
 - **Part 1: Participants.** User adds all people participating with their information (name, climbing level).
 - **Part 2: Objectives.** User enters group objectives: challenge, fun, performance, etc.
-- **Part 3: Weather conditions.** Displays weather forecast (rain, snow, wind, temperature) and avalanche risk level for the race date. Sourced from MeteoFrance APIs. Filled after a race is selected.
+- **Part 3: Weather conditions.** Displays weather forecast (rain, snow, wind, temperature) and avalanche risk level for the race date. Forecast sourced from Open-Meteo; avalanche risk from MeteoFrance DPBRA. Filled after a race is selected.
 - **Part 4: Race search.** Inputs as described in **First Launch** (date, type, difficulty, location, participants). A Search button launches the search and displays a list of matching routes. Selecting a route fills Parts 3, 5, 6, 7, 8, and 9.
 - **Part 5: Race detail.** Filled when a race is selected. Displays: route topo (pitch-by-pitch with French grades for multipitch), elevation profile, map view with GPX track, and full route description.
 - **Part 6: Risks, points of vigilance.** Filled when a race is selected. Data from CampToCamp user comments and the route's global description.
@@ -273,9 +286,9 @@ Layout:
 
 ### Technical Notes
 
-- **GRIB2 decoding**: AROME and ARPEGE return forecast data as GRIB2 binary files. The Go backend decodes them with a **pure-Go implementation** (no CGO, no eccodes) in `backend/meteo/forecast.go`. It implements WMO GRIB2 Template 5.0 (simple packing) directly. Key layout: Section 0 is 16 bytes — bytes 0–3 `"GRIB"`, bytes 4–5 reserved, byte 6 discipline (0 = Meteorological), byte 7 edition (2 = GRIB2), bytes 8–15 total length. BinaryScale and DecimalScale in Section 5 are signed `int16` (not `uint16`; misreading as unsigned causes overflow to `+Inf` for negative scales).
-- **WCS coverage semantics**: Each MeteoFrance WCS `CoverageId` encodes exactly **one valid time** (the timestamp suffix `___YYYY-MM-DDTHH.MM.SSZ`). The `subset=time(...)` parameter in GetCoverage must match the coverage's own timestamp exactly — it is not a filter across a multi-step run. To fetch a forecast for a given target time, select the coverage whose timestamp is closest to the target (within ±24 h) and use that coverage's timestamp in `subset=time(...)`.
-- **Model selection**: use AROME (2.5 km resolution, max +48 h) for race dates within 2 days of today; use ARPEGE (global model, up to +4 days) for dates beyond that.
+- **Weather forecast implementation**: `backend/meteo/forecast.go` calls Open-Meteo with a single GET request. For race dates within 4 days: `models=meteofrance_seamless`, `temperature_100m`. Beyond 4 days: no `models` param, `temperature_120m`. Always requests `wind_speed_10m` and `precipitation`. Returns a daily summary (min/max temp, total precipitation, max wind) plus 24 hourly points.
+- **Avalanche forecast implementation**: `backend/meteo/avalanche.go` calls MeteoFrance DPBRA using a Bearer token from `backend/meteo/token.go`. Steps: (1) `GET /liste-massifs` to get GeoJSON massif polygons; (2) point-in-polygon test to find the containing massif; (3) `GET /massif/BRA?id-massif=X&format=xml` to fetch the BRA XML and extract `RISQUEMAXI` for the target date. Returns `massif_id` and `massif_name` in the response. Falls back to a mock result (`risk_level=2`, no `massif_id`) when credentials are absent or the API is unreachable.
+- **Avalanche image proxy**: `backend/meteo/avalanche.go#ProxyMassifImage` fetches `GET /massif/image/{type}?id-massif=X` from DPBRA with Bearer auth and streams the response. Exposed as `GET /api/avalanche/image` in `backend/api/weather.go`. Allowed image types: `montagne-risques`, `apercu-meteo`, `sept-derniers-jours`. The frontend renders these images directly using `<img src="/api/avalanche/image?...">` when `massif_id > 0`.
 
 ---
 

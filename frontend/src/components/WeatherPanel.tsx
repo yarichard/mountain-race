@@ -2,9 +2,21 @@
 
 import { useTranslations } from "next-intl";
 import type { WeatherData } from "@/lib/types";
+import { LoadingSpinner } from "./LoadingSpinner";
+import {
+  ComposedChart,
+  Line,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 interface Props {
   weather: WeatherData | null;
+  loading?: boolean;
   error?: boolean;
 }
 
@@ -20,7 +32,10 @@ const CONDITION_ICONS: Record<string, string> = {
   storm: "⛈️",
 };
 
-export function WeatherPanel({ weather, error }: Props) {
+const CHART_TEMP_COLOR = "#1F2782";
+const CHART_WIND_COLOR = "#e57c2b";
+
+export function WeatherPanel({ weather, loading, error }: Props) {
   const t = useTranslations("weather");
 
   if (!weather) {
@@ -28,7 +43,13 @@ export function WeatherPanel({ weather, error }: Props) {
       <div className="panel flex flex-col h-full">
         <div className="panel-header">{t("title")}</div>
         <div className={`panel-body flex-1 flex items-center justify-center text-sm text-center ${error ? "text-red-600" : "text-[var(--text-muted)]"}`}>
-          {error ? t("error") : t("empty")}
+          {loading ? (
+            <LoadingSpinner message={t("loading")} />
+          ) : error ? (
+            t("error")
+          ) : (
+            t("empty")
+          )}
         </div>
       </div>
     );
@@ -59,13 +80,70 @@ export function WeatherPanel({ weather, error }: Props) {
           <span className="text-[var(--text-muted)]">{t("wind")}</span>
           <span className="font-medium">{forecast.wind_speed_kmh.toFixed(0)} km/h</span>
         </div>
-        <div className={`rounded-lg px-3 py-2 text-sm ${RISK_BG[avalanche.risk_level] ?? "bg-gray-100"}`}>
-          <span className="font-semibold">{t("avalanche")}: </span>
-          <span className={`font-bold ${RISK_COLORS[avalanche.risk_level] ?? ""}`}>
-            {avalanche.risk_label} ({avalanche.risk_level}/5)
-          </span>
-          <p className="text-xs mt-1 opacity-80">{avalanche.description}</p>
-        </div>
+        {weather.hourly && weather.hourly.length > 0 && (
+          <div data-testid="hourly-chart">
+            <ResponsiveContainer width="100%" height={110}>
+              <ComposedChart data={weather.hourly} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <XAxis
+                  dataKey="hour"
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(h: number) => `${h}h`}
+                />
+                <YAxis yAxisId="temp" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="wind" orientation="right" tick={{ fontSize: 10 }} />
+                <Tooltip
+                  formatter={(val, name) =>
+                    name === t("chart.temp") ? [`${val}°C`, name] : [`${val} km/h`, name]
+                  }
+                  labelFormatter={(h) => `${h}:00`}
+                  position={{ y: -55 }}
+                  wrapperStyle={{ fontSize: 10, zIndex: 9999 }}
+                />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Line
+                  yAxisId="temp"
+                  type="monotone"
+                  dataKey="temperature_c"
+                  name={t("chart.temp")}
+                  stroke={CHART_TEMP_COLOR}
+                  dot={false}
+                  strokeWidth={2}
+                />
+                <Bar
+                  yAxisId="wind"
+                  dataKey="wind_speed_kmh"
+                  name={t("chart.wind")}
+                  fill={CHART_WIND_COLOR}
+                  opacity={0.6}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        {avalanche ? (
+          <div className={`rounded-lg px-3 py-2 text-sm ${RISK_BG[avalanche.risk_level] ?? "bg-gray-100"}`}>
+            <span className="font-semibold">{t("avalanche")}: </span>
+            <span className={`font-bold ${RISK_COLORS[avalanche.risk_level] ?? ""}`}>
+              {avalanche.risk_label} ({avalanche.risk_level}/5)
+            </span>
+            {avalanche.massif_name && (
+              <p className="text-xs mt-1 opacity-70">{t("massif")}: {avalanche.massif_name}</p>
+            )}
+            <p className="text-xs mt-1 opacity-80">{avalanche.description}</p>
+            {avalanche.massif_id && avalanche.massif_id > 0 && (
+              <div className="mt-2 space-y-2 overflow-y-auto max-h-96">
+                {(["montagne-risques", "apercu-meteo", "sept-derniers-jours"] as const).map((imgType) => (
+                  <img
+                    key={imgType}
+                    src={`/api/avalanche/image?massif_id=${avalanche.massif_id}&type=${imgType}`}
+                    alt={imgType}
+                    className="w-full rounded object-contain"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { ParticipantsPanel } from "@/components/ParticipantsPanel";
 import { ObjectivesPanel } from "@/components/ObjectivesPanel";
@@ -22,26 +22,46 @@ export default function Home() {
   const [objectives, setObjectives] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [route, setRoute] = useState<RouteDetail | null>(null);
+  const [loadingRoute, setLoadingRoute] = useState(false);
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [loadingWeather, setLoadingWeather] = useState(false);
   const [weatherError, setWeatherError] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // true initially so the first route selection always fetches weather
+  const weatherStale = useRef(true);
 
-  const handleRouteSelected = async (id: string, date: string) => {
-    const routeRes = await fetch(`/api/routes/${id}`);
-    if (!routeRes.ok) return;
-    const routeData = await routeRes.json();
-    setRoute(routeData);
-
+  const fetchWeatherForRoute = async (lat: number, lon: number, date: string) => {
     setWeather(null);
     setWeatherError(false);
-    const lat = routeData.lat ?? 45.9;
-    const lon = routeData.lon ?? 6.9;
-    const weatherRes = await fetch(`/api/weather?lat=${lat}&lon=${lon}&date=${date}`);
-    if (weatherRes.ok) {
-      setWeather(await weatherRes.json());
-    } else {
-      setWeatherError(true);
+    setLoadingWeather(true);
+    const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}&date=${date}`);
+    setLoadingWeather(false);
+    if (res.ok) setWeather(await res.json());
+    else setWeatherError(true);
+  };
+
+  // Called when the search date changes: refresh weather immediately if a route is already selected
+  const handleDateChange = (date: string, currentRoute: typeof route) => {
+    if (currentRoute) {
+      void fetchWeatherForRoute(currentRoute.lat ?? 45.9, currentRoute.lon ?? 6.9, date);
     }
+  };
+
+  // Called when a new search is launched: mark weather stale so the next route selection refreshes it
+  const handleWeatherInvalidated = () => { weatherStale.current = true; };
+
+  const handleRouteSelected = async (id: string, date: string) => {
+    setRoute(null);
+    setLoadingRoute(true);
+    const routeRes = await fetch(`/api/routes/${id}`);
+    if (!routeRes.ok) { setLoadingRoute(false); return; }
+    const routeData = await routeRes.json();
+    setRoute(routeData);
+    setLoadingRoute(false);
+
+    if (!weatherStale.current) return;
+    weatherStale.current = false;
+    void fetchWeatherForRoute(routeData.lat ?? 45.9, routeData.lon ?? 6.9, date);
   };
 
   const handleExport = async () => {
@@ -99,7 +119,7 @@ export default function Home() {
         className="flex-1 p-2 gap-2 overflow-hidden"
         style={{
           display: "grid",
-          gridTemplateColumns: "210px 1fr 270px",
+          gridTemplateColumns: "210px 1fr 350px",
           gridTemplateRows: "auto 1fr auto auto",
           gridTemplateAreas: `
             "p1  top-mid   p3"
@@ -128,12 +148,17 @@ export default function Home() {
             onObjectivesChange={setObjectives}
             onNotesChange={setNotes}
           />
-          <SearchPanel participants={participants} onRouteSelected={handleRouteSelected} />
+          <SearchPanel
+            participants={participants}
+            onRouteSelected={handleRouteSelected}
+            onWeatherInvalidated={handleWeatherInvalidated}
+            onDateChange={(date) => handleDateChange(date, route)}
+          />
         </div>
 
         {/* Part 5: Race detail — col 2, rows 2-3 */}
         <div style={{ gridArea: "p5" }} className="min-h-0">
-          <DetailPanel route={route} />
+          <DetailPanel route={route} loading={loadingRoute} />
         </div>
 
         {/* Bottom-mid: Part 8 + Part 7 */}
@@ -144,7 +169,7 @@ export default function Home() {
 
         {/* Part 3: Weather — col 3, row 1 */}
         <div style={{ gridArea: "p3" }} className="min-h-0">
-          <WeatherPanel weather={weather} error={weatherError} />
+          <WeatherPanel weather={weather} loading={loadingWeather} error={weatherError} />
         </div>
 
         {/* Part 6: Risks — col 3, rows 2-4 */}

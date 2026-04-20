@@ -20,12 +20,18 @@
   "weather": {
     "title": "Weather",
     "empty": "Select a route to see weather",
+    "loading": "Fetching weather forecast...",
     "error": "Weather unavailable",
     "tempMin": "Min temp",
     "tempMax": "Max temp",
     "precipitation": "Precipitation",
     "wind": "Wind",
     "avalanche": "Avalanche risk",
+    "massif": "Massif",
+    "chart": {
+      "temp": "Temp (°C)",
+      "wind": "Wind (km/h)"
+    },
     "condition": {
       "sunny": "Sunny",
       "partly_cloudy": "Partly cloudy",
@@ -63,6 +69,7 @@
   "detail": {
     "title": "Route detail",
     "empty": "Select a route to see details",
+    "loading": "Loading route from CampToCamp...",
     "map": "Map",
     "elevation": "Elevation profile",
     "topo": "Topo / Description",
