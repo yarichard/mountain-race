@@ -81,7 +81,6 @@ The `Dockerfile.devcontainer` located at the root of the project is used for the
 │  ├── /api/*          REST endpoints             │
 │  └── /*              Static file serving        │
 │                      (Next.js export)           │
-│                                                 │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -148,61 +147,10 @@ Search for routes matching user criteria via CampToCamp.
 }
 ```
 
-**Response `200`:**
-```json
-{
-  "routes": [
-    {
-      "id": "string",
-      "title": "string",
-      "summary": "string",
-      "difficulty": "string",
-      "elevation_gain": 0,
-      "distance_km": 0.0,
-      "source_url": "string"
-    }
-  ]
-}
-```
-
 ---
 
 #### `GET /api/routes/:id`
 Fetch full detail for a single CampToCamp route.
-
-**Response `200`:**
-```json
-{
-  "id": "string",
-  "title": "string",
-  "description": "string",
-  "difficulty": "string",
-  "elevation_gain": 0,
-  "distance_km": 0.0,
-  "lat": 0.0,                    // WGS84 latitude, extracted from C2C geometry (EPSG:3857 → WGS84)
-  "lon": 0.0,                    // WGS84 longitude
-  "pitches": [                   // only for multipitch
-    { "number": 1, "grade": "string", "description": "string" }
-  ],
-  "topo_url": "string",          // link to topo image if available
-  "gpx_url": "string",           // link to GPX track if available
-  "equipment": [
-    { "item": "string", "quantity": 0, "notes": "string" }
-  ],
-  "risks": ["string"],
-  "alternative_routes": [
-    { "id": "string", "title": "string", "reason": "string" }
-  ],
-  "schedule": {
-    "estimated_duration_hours": 0.0,
-    "recommended_start_time": "06:00",
-    "recommended_end_time": "16:00",
-    "source": "camptocamp|formula"
-    // "formula" = Naismith's rule applied to distance + elevation; UI must show a clear notice to the user
-  },
-  "source_url": "string"
-}
-```
 
 ---
 
@@ -211,30 +159,6 @@ Fetch weather forecast and avalanche risk for a location and date.
 
 **Query params:** `lat`, `lon`, `date` (YYYY-MM-DD)
 
-**Response `200`:**
-```json
-{
-  "forecast": {
-    "date": "2006-01-02",
-    "temperature_min_c": 0.0,
-    "temperature_max_c": 0.0,
-    "precipitation_mm": 0.0,
-    "wind_speed_kmh": 0.0,
-    "condition": "string"         // e.g. "sunny", "snow", "rain"
-  },
-  "avalanche": {
-    "risk_level": 0,              // 1–5 European scale
-    "risk_label": "string",       // e.g. "Limité"
-    "description": "string",
-    "massif_id": 0,               // DPBRA massif code; 0 when unavailable (mock fallback)
-    "massif_name": "string"       // human-readable massif name
-  },
-  "hourly": [                     // 24 hourly points for the race date
-    { "hour": 0, "temperature_c": 0.0, "wind_speed_kmh": 0.0 }
-  ]
-}
-```
-
 ---
 
 #### `GET /api/avalanche/image`
@@ -242,16 +166,12 @@ Proxy a DPBRA massif image through the backend (required because the MeteoFrance
 
 **Query params:** `massif_id` (integer), `type` (one of `montagne-risques`, `apercu-meteo`, `sept-derniers-jours`)
 
-**Response `200`:** image binary (`Content-Type` forwarded from DPBRA)
-
 ---
 
 #### `POST /api/export/pdf`
 Generate and return a PDF of the full race plan using headless Chromium. Output is landscape A4.
 
 **Request body:** same shape as `GET /api/routes/:id` response, plus weather block.
-
-**Response `200`:** `application/pdf` binary stream.
 
 ---
 
@@ -313,19 +233,6 @@ Stage 2: node:24-slim
 ```
 
 Gin serves static frontend files and all `/api/*` routes on port 8003.
-
-### Makefile targets
-
-| Target | Description |
-|---|---|
-| `make build` | Build the Docker image (`mountain-race`) |
-| `make run` | Run the Docker container on port 8003, loading `.env` |
-| `make local-build` | Build frontend → copy static files → build Go binary, all without Docker |
-| `make local-run` | Run the Go binary locally (after `local-build`); serves on port 8003 |
-
-### Optional Cloud Deployment
-
-The container is designed to deploy to AWS App Runner, Render, or any container platform. A Terraform configuration for App Runner may be provided in a `deploy/` directory as a stretch goal, but is not part of the core build.
 
 ---
 

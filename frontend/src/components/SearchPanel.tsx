@@ -155,6 +155,7 @@ export function SearchPanel({ participants, onRouteSelected, onWeatherInvalidate
                 {results.map((r) => (
                   <div
                     key={r.id}
+                    data-testid="route-result"
                     className="border border-[var(--border)] rounded p-2 hover:border-[var(--primary)] hover:bg-[var(--surface-alt)] cursor-pointer transition"
                     onClick={() => { onRouteSelected(r.id, date); setResults(null); }}
                   >
