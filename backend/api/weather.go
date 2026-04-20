@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"net/http"
 	"strconv"
 	"time"
@@ -32,20 +33,51 @@ func GetWeather(c *gin.Context) {
 		return
 	}
 
-	forecast, err := meteo.Forecast(lat, lon, date)
+	forecast, hourly, err := meteo.FetchWeather(lat, lon, date)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	avalanche, err := meteo.AvalancheForecast(lat, lon)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	avalanche, _ := meteo.AvalancheForecast(lat, lon, date)
 
 	c.JSON(http.StatusOK, gin.H{
 		"forecast":  forecast,
 		"avalanche": avalanche,
+		"hourly":    hourly,
 	})
+}
+
+var allowedImageTypes = map[string]bool{
+	"montagne-risques":  true,
+	"apercu-meteo":      true,
+	"sept-derniers-jours": true,
+}
+
+// GetAvalancheImage proxies a DPBRA massif image (requires Bearer auth).
+// GET /api/avalanche/image?massif_id=X&type=montagne-risques
+func GetAvalancheImage(c *gin.Context) {
+	massifIDStr := c.Query("massif_id")
+	imageType := c.Query("type")
+
+	massifID, err := strconv.Atoi(massifIDStr)
+	if err != nil || massifID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid massif_id"})
+		return
+	}
+	if !allowedImageTypes[imageType] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid type"})
+		return
+	}
+
+	var buf bytes.Buffer
+	ct, err := meteo.ProxyMassifImage(&buf, massifID, imageType)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	if ct == "" {
+		ct = "image/png"
+	}
+	c.Data(http.StatusOK, ct, buf.Bytes())
 }

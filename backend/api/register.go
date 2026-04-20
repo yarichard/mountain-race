@@ -9,5 +9,6 @@ func Register(r *gin.Engine) {
 	g.POST("/routes/search", SearchRoutes)
 	g.GET("/routes/:id", GetRoute)
 	g.GET("/weather", GetWeather)
+	g.GET("/avalanche/image", GetAvalancheImage)
 	g.POST("/export/pdf", ExportPDF)
 }

@@ -70,11 +70,20 @@ export interface Avalanche {
   risk_level: number;
   risk_label: string;
   description: string;
+  massif_id?: number;
+  massif_name?: string;
+}
+
+export interface HourlyPoint {
+  hour: number;
+  temperature_c: number;
+  wind_speed_kmh: number;
 }
 
 export interface WeatherData {
   forecast: Forecast;
-  avalanche: Avalanche;
+  avalanche: Avalanche | null;
+  hourly?: HourlyPoint[];
 }
 
 export type RaceType = "multipitch" | "ridge_hike" | "hike";

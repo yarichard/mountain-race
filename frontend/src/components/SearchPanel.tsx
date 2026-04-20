@@ -7,9 +7,11 @@ import { MULTIPITCH_GRADES, ALPINE_GRADES, type RaceType, type RouteResult, type
 interface Props {
   participants: Participant[];
   onRouteSelected: (id: string, date: string) => void;
+  onWeatherInvalidated?: () => void;
+  onDateChange?: (date: string) => void;
 }
 
-export function SearchPanel({ participants, onRouteSelected }: Props) {
+export function SearchPanel({ participants, onRouteSelected, onWeatherInvalidated, onDateChange }: Props) {
   const t = useTranslations("search");
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -28,6 +30,7 @@ export function SearchPanel({ participants, onRouteSelected }: Props) {
   };
 
   const search = async () => {
+    onWeatherInvalidated?.();
     setSearching(true);
     setResults(null);
     try {
@@ -66,7 +69,7 @@ export function SearchPanel({ participants, onRouteSelected }: Props) {
             type="date"
             className="w-full border border-[var(--border)] rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => { setDate(e.target.value); onDateChange?.(e.target.value); }}
           />
         </div>
 

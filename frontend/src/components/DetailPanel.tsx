@@ -5,12 +5,14 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { RouteDetail } from "@/lib/types";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 // Leaflet must be loaded client-side only
 const MapView = dynamic(() => import("./MapView"), { ssr: false });
 
 interface Props {
   route: RouteDetail | null;
+  loading?: boolean;
 }
 
 type Tab = "map" | "elevation" | "topo";
@@ -28,7 +30,7 @@ function makeSyntheticProfile(elevGain: number, distKm: number) {
   });
 }
 
-export function DetailPanel({ route }: Props) {
+export function DetailPanel({ route, loading }: Props) {
   const t = useTranslations("detail");
   const [tab, setTab] = useState<Tab>("topo");
 
@@ -41,7 +43,7 @@ export function DetailPanel({ route }: Props) {
       <div className="panel flex flex-col h-full">
         <div className="panel-header">{t("title")}</div>
         <div className="panel-body flex-1 flex items-center justify-center text-sm text-[var(--text-muted)] text-center">
-          {t("empty")}
+          {loading ? <LoadingSpinner message={t("loading")} /> : t("empty")}
         </div>
       </div>
     );
