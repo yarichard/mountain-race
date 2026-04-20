@@ -8,3 +8,4 @@ backend/bin/
 .vscode
 .DS_Store
 backend/static/
+test/test-results
