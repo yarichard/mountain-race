@@ -152,6 +152,7 @@ export default function Home() {
             participants={participants}
             onRouteSelected={handleRouteSelected}
             onWeatherInvalidated={handleWeatherInvalidated}
+            objectives={objectives}
             onDateChange={(date) => handleDateChange(date, route)}
           />
         </div>
