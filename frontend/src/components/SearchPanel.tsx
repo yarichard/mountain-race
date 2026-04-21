@@ -1,17 +1,57 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
-import { MULTIPITCH_GRADES, ALPINE_GRADES, type RaceType, type RouteResult, type Participant } from "@/lib/types";
+import { useEffect, useState } from "react";
+import {
+  MULTIPITCH_GRADES,
+  ALPINE_GRADES,
+  ALPINE_TO_CLIMBING,
+  CLIMBING_LEVELS,
+  type RaceType,
+  type RouteResult,
+  type Participant,
+} from "@/lib/types";
 
 interface Props {
   participants: Participant[];
+  objectives: string[];
   onRouteSelected: (id: string, date: string) => void;
   onWeatherInvalidated?: () => void;
   onDateChange?: (date: string) => void;
 }
 
-export function SearchPanel({ participants, onRouteSelected, onWeatherInvalidated, onDateChange }: Props) {
+function gradeIndexInClimbing(g: string): number {
+  return (CLIMBING_LEVELS as readonly string[]).indexOf(g);
+}
+
+function alpineToClimbingEquiv(alpine: string): string {
+  return ALPINE_TO_CLIMBING[alpine] ?? "";
+}
+
+function gradeColor(grade: string, lowestLevel: string, raceType: RaceType): string {
+  if (!lowestLevel) return "";
+  const routeEquiv =
+    raceType === "multipitch" ? grade : alpineToClimbingEquiv(grade);
+  if (!routeEquiv) return "";
+  const ri = gradeIndexInClimbing(routeEquiv);
+  const pi = gradeIndexInClimbing(lowestLevel);
+  if (ri < 0 || pi < 0) return "";
+  if (ri < pi) return "green";
+  if (ri === pi) return "black";
+  return "red";
+}
+
+function badgeClass(color: string): string {
+  if (color === "green") return "bg-green-600 text-white";
+  if (color === "red") return "bg-red-600 text-white";
+  return "bg-[var(--primary)] text-white";
+}
+
+function hasPermissiveObjective(objectives: string[]): boolean {
+  return objectives.some((o) => o === "challenge" || o === "performance");
+}
+
+export function SearchPanel({ participants, objectives, onRouteSelected }: Props) {
   const t = useTranslations("search");
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -21,12 +61,39 @@ export function SearchPanel({ participants, onRouteSelected, onWeatherInvalidate
   const [locationType, setLocationType] = useState<"name" | "location">("name");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<RouteResult[] | null>(null);
+  const [allowAbove, setAllowAbove] = useState(() =>
+    hasPermissiveObjective(objectives)
+  );
 
-  const grades = raceType === "multipitch" ? MULTIPITCH_GRADES : ALPINE_GRADES;
+  // Sync checkbox default when objectives change.
+  useEffect(() => {
+    setAllowAbove(hasPermissiveObjective(objectives));
+  }, [objectives]);
 
-  const handleRaceTypeChange = (t: RaceType) => {
-    setRaceType(t);
-    setDifficulty(t === "multipitch" ? "5c" : "AD");
+  const allGrades = raceType === "multipitch" ? MULTIPITCH_GRADES : ALPINE_GRADES;
+
+  // Lowest climbing level among participants with a valid level set.
+  const filledParticipants = participants.filter((p) => p.name.trim() !== "");
+  const lowestLevel =
+    filledParticipants.length === 0
+      ? ""
+      : filledParticipants.reduce((min, p) => {
+          const mi = gradeIndexInClimbing(min);
+          const pi = gradeIndexInClimbing(p.climbingLevel);
+          return pi >= 0 && (mi < 0 || pi < mi) ? p.climbingLevel : min;
+        }, filledParticipants[0].climbingLevel);
+
+  // Grades shown in the difficulty dropdown, filtered when allowAbove is false.
+  const visibleGrades = allGrades.filter((g) => {
+    if (!lowestLevel || allowAbove) return true;
+    const color = gradeColor(g, lowestLevel, raceType);
+    return color !== "red";
+  });
+
+  const handleRaceTypeChange = (rt: RaceType) => {
+    setRaceType(rt);
+    const defaultDiff = rt === "multipitch" ? "5c" : "AD";
+    setDifficulty(defaultDiff);
   };
 
   const search = async () => {
@@ -42,6 +109,7 @@ export function SearchPanel({ participants, onRouteSelected, onWeatherInvalidate
           location_type: locationType,
           race_type: raceType,
           difficulty,
+          allow_above: allowAbove,
           date,
           participants: participants.map((p) => ({
             name: p.name,
@@ -101,10 +169,33 @@ export function SearchPanel({ participants, onRouteSelected, onWeatherInvalidate
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value)}
           >
-            {grades.map((g) => (
-              <option key={g} value={g}>{g}</option>
-            ))}
+            {visibleGrades.map((g) => {
+              const c = gradeColor(g, lowestLevel, raceType);
+              return (
+                <option
+                  key={g}
+                  value={g}
+                  style={{
+                    color: c === "green" ? "#16a34a" : c === "red" ? "#dc2626" : undefined,
+                    fontWeight: c ? "600" : undefined,
+                  }}
+                >
+                  {g}
+                </option>
+              );
+            })}
           </select>
+
+          {/* Allow-above checkbox */}
+          <label className="flex items-center gap-1.5 mt-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="accent-[var(--primary)]"
+              checked={allowAbove}
+              onChange={(e) => setAllowAbove(e.target.checked)}
+            />
+            <span className="text-xs text-[var(--text-muted)]">{t("allowAbove")}</span>
+          </label>
         </div>
 
         {/* Location */}
@@ -161,7 +252,9 @@ export function SearchPanel({ participants, onRouteSelected, onWeatherInvalidate
                   >
                     <div className="flex justify-between items-start gap-2">
                       <p className="text-sm font-medium leading-tight flex-1">{r.title}</p>
-                      <span className="shrink-0 text-xs font-bold bg-[var(--primary)] text-white rounded px-1.5 py-0.5">{r.difficulty}</span>
+                      <span className={`shrink-0 text-xs font-bold rounded px-1.5 py-0.5 ${badgeClass(r.difficulty_color)}`}>
+                        {r.difficulty}
+                      </span>
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">
                       ↑{r.elevation_gain}m · {r.distance_km.toFixed(1)}km

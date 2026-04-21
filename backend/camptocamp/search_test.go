@@ -57,7 +57,7 @@ func TestSearch_ByName_ParsesResults(t *testing.T) {
 	docs := []map[string]any{
 		{
 			"document_id":       float64(123456),
-			"climbing_rating":   "5c",
+			"rock_free_rating":  "5c",
 			"elevation_gain_up": float64(650),
 			"route_length":      float64(4200),
 			"locales": []any{

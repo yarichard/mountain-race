@@ -53,6 +53,7 @@
       "name": "Name",
       "location": "Area"
     },
+    "allowAbove": "Include grades above my level",
     "search": "Search",
     "searching": "Searching...",
     "results": "Results",

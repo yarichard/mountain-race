@@ -13,7 +13,8 @@ var baseURL = "https://api.camptocamp.org"
 var httpClient = &http.Client{Timeout: 15 * time.Second}
 
 func get(path string) (map[string]any, error) {
-	resp, err := httpClient.Get(baseURL + path)
+	route := baseURL + path
+	resp, err := httpClient.Get(route)
 	if err != nil {
 		return nil, fmt.Errorf("camptocamp GET %s: %w", path, err)
 	}
@@ -64,20 +65,43 @@ func floatField(m map[string]any, key string) float64 {
 	return 0
 }
 
-// localizedString extracts the French or first available localized string from a C2C locale map.
-func localizedString(m map[string]any, key string) string {
-	raw, ok := m[key]
-	if !ok || raw == nil {
-		return ""
+// pickLocale selects the best localized field value from C2C's locales array.
+// It tries the preferred language first, then "fr", then "en", then the first available.
+func pickLocale(locales []any, lang, field string) string {
+	prefs := []string{lang, "fr", "en"}
+	seen := map[string]bool{}
+	for _, p := range prefs {
+		if p == "" || seen[p] {
+			continue
+		}
+		seen[p] = true
+		for _, l := range locales {
+			lm, ok := l.(map[string]any)
+			if !ok {
+				continue
+			}
+			if lm["lang"] == p {
+				if v, ok := lm[field].(string); ok && v != "" {
+					return v
+				}
+			}
+		}
 	}
-	loc, ok := raw.(map[string]any)
-	if !ok {
-		return ""
-	}
-	for _, lang := range []string{"fr", "en", "de", "it", "es"} {
-		if s, ok := loc[lang].(string); ok && s != "" {
-			return s
+	// Fallback: first non-empty regardless of language.
+	for _, l := range locales {
+		lm, ok := l.(map[string]any)
+		if !ok {
+			continue
+		}
+		if v, ok := lm[field].(string); ok && v != "" {
+			return v
 		}
 	}
 	return ""
+}
+
+// localesField extracts the locales array from a C2C document map.
+func localesField(m map[string]any) []any {
+	locs, _ := m["locales"].([]any)
+	return locs
 }

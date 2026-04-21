@@ -14,20 +14,83 @@ import (
 
 // RouteType maps our internal race type to C2C activity codes.
 var activityMap = map[string]string{
-	"multipitch":  "rock_climbing",
-	"ridge_hike":  "mountain_climbing",
-	"hike":        "hiking",
+	"multipitch": "rock_climbing",
+	"ridge_hike": "mountain_climbing",
+	"hike":       "hiking",
+}
+
+// climbingGradeOrder is the ordered French sport climbing scale used for comparisons.
+var climbingGradeOrder = []string{
+	"3a", "3b", "3c",
+	"4a", "4b", "4c",
+	"5a", "5b", "5c",
+	"6a", "6a+", "6b", "6b+", "6c", "6c+",
+	"7a", "7a+", "7b", "7b+", "7c", "7c+",
+	"8a", "8a+", "8b", "8b+", "8c", "8c+",
+	"9a", "9b", "9c",
+}
+
+// alpineToClimbing maps alpine cotation to its French climbing grade equivalent.
+var alpineToClimbing = map[string]string{
+	"F":  "3c",
+	"PD": "4c",
+	"AD": "5c",
+	"D":  "6b+",
+	"TD": "7b",
+	"ED": "8a+",
+}
+
+// normalizeGrade converts C2C's internal suffix (_sup) to the standard display format (+).
+func normalizeGrade(g string) string {
+	return strings.ReplaceAll(g, "_sup", "+")
+}
+
+func gradeIndex(g string) int {
+	g = normalizeGrade(g)
+	for i, v := range climbingGradeOrder {
+		if v == g {
+			return i
+		}
+	}
+	return -1
+}
+
+var alpineGradeOrder = []string{"F", "PD", "AD", "D", "TD", "ED"}
+
+func alpineGradeIndex(g string) int {
+	for i, v := range alpineGradeOrder {
+		if v == g {
+			return i
+		}
+	}
+	return -1
+}
+
+// colorFromIndices returns "green", "black", or "red" given pre-computed ordinal indices.
+// Returns "" when either index is unknown (-1).
+func colorFromIndices(routeIdx, diffIdx int) string {
+	if routeIdx < 0 || diffIdx < 0 {
+		return ""
+	}
+	if routeIdx < diffIdx {
+		return "green"
+	}
+	if routeIdx == diffIdx {
+		return "black"
+	}
+	return "red"
 }
 
 // SearchResult is a lightweight route summary.
 type SearchResult struct {
-	ID           string  `json:"id"`
-	Title        string  `json:"title"`
-	Summary      string  `json:"summary"`
-	Difficulty   string  `json:"difficulty"`
-	ElevationGain int    `json:"elevation_gain"`
-	DistanceKm   float64 `json:"distance_km"`
-	SourceURL    string  `json:"source_url"`
+	ID              string  `json:"id"`
+	Title           string  `json:"title"`
+	Summary         string  `json:"summary"`
+	Difficulty      string  `json:"difficulty"`
+	DifficultyColor string  `json:"difficulty_color"`
+	ElevationGain   int     `json:"elevation_gain"`
+	DistanceKm      float64 `json:"distance_km"`
+	SourceURL       string  `json:"source_url"`
 }
 
 // Participant holds a single person's details.
@@ -42,7 +105,9 @@ type SearchRequest struct {
 	LocationType string        `json:"location_type"` // "name" | "location"
 	RaceType     string        `json:"race_type"`
 	Difficulty   string        `json:"difficulty"`
+	AllowAbove   bool          `json:"allow_above"`
 	Date         string        `json:"date"`
+	Lang         string        `json:"lang"` // preferred display language, e.g. "fr" or "en"
 	Participants []Participant `json:"participants"`
 }
 
@@ -82,64 +147,65 @@ func Search(req SearchRequest) ([]SearchResult, error) {
 			continue
 		}
 		id := fmt.Sprintf("%.0f", floatField(m, "document_id"))
-		title := localizedString(m, "locales")
-		if title == "" {
-			title = firstLocaleTitle(m)
+		locs := localesField(m)
+		title := pickLocale(locs, req.Lang, "title")
+		difficulty, color := gradeFromDoc(m, req.RaceType, req.Difficulty)
+		if color == "red" && !req.AllowAbove {
+			continue // route is harder than the selected difficulty
 		}
-		difficulty := gradeFromDoc(m, req.RaceType)
 		results = append(results, SearchResult{
-			ID:            id,
-			Title:         title,
-			Summary:       summaryFromDoc(m),
-			Difficulty:    difficulty,
-			ElevationGain: intField(m, "elevation_gain_up"),
-			DistanceKm:    floatField(m, "route_length") / 1000,
-			SourceURL:     "https://www.camptocamp.org/routes/" + id,
+			ID:              id,
+			Title:           title,
+			Summary:         pickLocale(locs, req.Lang, "summary"),
+			Difficulty:      difficulty,
+			DifficultyColor: color,
+			ElevationGain:   intField(m, "elevation_gain_up"),
+			DistanceKm:      floatField(m, "route_length") / 1000,
+			SourceURL:       "https://www.camptocamp.org/routes/" + id,
 		})
 	}
 
 	return results, nil
 }
 
-func firstLocaleTitle(m map[string]any) string {
-	locales, ok := m["locales"].([]any)
-	if !ok {
-		return ""
-	}
-	for _, l := range locales {
-		lm, ok := l.(map[string]any)
-		if !ok {
-			continue
-		}
-		if t, ok := lm["title"].(string); ok && t != "" {
-			return t
-		}
-	}
-	return ""
-}
 
-func summaryFromDoc(m map[string]any) string {
-	locales, ok := m["locales"].([]any)
-	if !ok {
-		return ""
-	}
-	for _, l := range locales {
-		lm, ok := l.(map[string]any)
-		if !ok {
-			continue
-		}
-		if s, ok := lm["summary"].(string); ok && s != "" {
-			return s
+// gradeFromDoc builds the display grade string for a route and computes a color by comparing
+// the route's key rating against selectedDifficulty (the value chosen in the search form).
+// For multipitch: compares French sport grades. For hike/ridge_hike: compares alpine cotation directly.
+func gradeFromDoc(m map[string]any, raceType, selectedDifficulty string) (grade, color string) {
+	var parts []string
+	addPart := func(key string) {
+		if v := normalizeGrade(stringField(m, key)); v != "" {
+			parts = append(parts, v)
 		}
 	}
-	return ""
-}
+	addPart("global_rating")
+	free := normalizeGrade(stringField(m, "rock_free_rating"))
+	req := normalizeGrade(stringField(m, "rock_required_rating"))
+	switch {
+	case free != "" && req != "":
+		parts = append(parts, free+" > "+req)
+	case free != "":
+		parts = append(parts, free)
+	case req != "":
+		parts = append(parts, req)
+	}
+	addPart("engagement_rating")
+	addPart("equipment_rating")
+	addPart("exposition_rock_rating")
+	grade = strings.Join(parts, " ")
 
-func gradeFromDoc(m map[string]any, raceType string) string {
 	if raceType == "multipitch" {
-		return stringField(m, "climbing_rating")
+		routeGrade := normalizeGrade(stringField(m, "rock_required_rating"))
+		if routeGrade == "" {
+			routeGrade = normalizeGrade(stringField(m, "rock_free_rating"))
+		}
+		color = colorFromIndices(gradeIndex(routeGrade), gradeIndex(selectedDifficulty))
+	} else {
+		routeGrade := stringField(m, "global_rating")
+		color = colorFromIndices(alpineGradeIndex(routeGrade), alpineGradeIndex(selectedDifficulty))
 	}
-	return stringField(m, "global_rating")
+	return grade, color
 }
 
 var nominatimClient = &http.Client{Timeout: 10 * time.Second}

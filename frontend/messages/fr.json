@@ -53,6 +53,7 @@
       "name": "Nom",
       "location": "Lieu"
     },
+    "allowAbove": "Inclure les niveaux supérieurs",
     "search": "Rechercher",
     "searching": "Recherche...",
     "results": "Résultats",

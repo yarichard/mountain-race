@@ -56,22 +56,30 @@ type RouteDetail struct {
 }
 
 // GetDetail fetches full route detail from CampToCamp.
-func GetDetail(id string) (*RouteDetail, error) {
+func GetDetail(id, lang string) (*RouteDetail, error) {
 	data, err := get("/routes/" + id)
 	if err != nil {
 		return nil, err
 	}
 
-	title := firstLocaleTitle(data)
-	description := firstLocaleDescription(data)
+	locs := localesField(data)
+	title := pickLocale(locs, lang, "title_prefix") + " / " + pickLocale(locs, lang, "title")
+	description := pickLocale(locs, lang, "route_history") + "\n"
+	description += pickLocale(locs, lang, "summary")+ "\n"
+	description += pickLocale(locs, lang, "description")+ "\n"
+	if description == "" {
+		description = pickLocale(locs, lang, "route_history")+ "\n"
+	}
+	description += pickLocale(locs, lang, "external_resources")+ "\n"
+
 	difficulty := bestGrade(data)
 	elevGain := intField(data, "elevation_gain_up")
 	routeLen := floatField(data, "route_length") / 1000
 
-	pitches := parsePitches(data)
-	equipment := parseEquipment(data)
-	risks := parseRisks(data)
-	alts := parseAlternatives(data)
+	pitches := parsePitches(data, lang)
+	equipment := parseEquipment(data, lang)
+	risks := parseRisks(data, lang)
+	alts := parseAlternatives(data, lang)
 	lat, lon := parseLatLon(data)
 
 	// Schedule: check if C2C has duration data in comments/description
@@ -106,26 +114,6 @@ func GetDetail(id string) (*RouteDetail, error) {
 	}, nil
 }
 
-func firstLocaleDescription(m map[string]any) string {
-	locales, ok := m["locales"].([]any)
-	if !ok {
-		return ""
-	}
-	for _, l := range locales {
-		lm, ok := l.(map[string]any)
-		if !ok {
-			continue
-		}
-		if d, ok := lm["description"].(string); ok && d != "" {
-			return d
-		}
-		if d, ok := lm["route_history"].(string); ok && d != "" {
-			return d
-		}
-	}
-	return ""
-}
-
 func bestGrade(m map[string]any) string {
 	for _, key := range []string{"climbing_rating", "global_rating", "hiking_rating"} {
 		if g := stringField(m, key); g != "" {
@@ -135,49 +123,19 @@ func bestGrade(m map[string]any) string {
 	return ""
 }
 
-func parsePitches(m map[string]any) []Pitch {
-	locales, ok := m["locales"].([]any)
-	if !ok {
+func parsePitches(m map[string]any, lang string) []Pitch {
+	locs := localesField(m)
+	pitchText := pickLocale(locs, lang, "pitch")
+	if pitchText == "" {
 		return nil
 	}
-	var pitches []Pitch
-	for _, l := range locales {
-		lm, ok := l.(map[string]any)
-		if !ok {
-			continue
-		}
-		pitchText, ok := lm["pitch"].(string)
-		if !ok || pitchText == "" {
-			continue
-		}
-		// C2C doesn't provide structured pitch data via JSON; return as single pitch
-		pitches = append(pitches, Pitch{
-			Number:      1,
-			Grade:       bestGrade(m),
-			Description: pitchText,
-		})
-		break
-	}
-	return pitches
+	return []Pitch{{Number: 1, Grade: bestGrade(m), Description: pitchText}}
 }
 
-func parseEquipment(m map[string]any) []Equipment {
+func parseEquipment(m map[string]any, lang string) []Equipment {
 	var result []Equipment
 
-	// gear field (string description)
-	gearText := ""
-	locales, _ := m["locales"].([]any)
-	for _, l := range locales {
-		lm, ok := l.(map[string]any)
-		if !ok {
-			continue
-		}
-		if g, ok := lm["gear"].(string); ok && g != "" {
-			gearText = g
-			break
-		}
-	}
-	if gearText != "" {
+	if gearText := pickLocale(localesField(m), lang, "gear"); gearText != "" {
 		result = append(result, Equipment{Item: gearText, Quantity: 1, Notes: ""})
 	}
 
@@ -192,28 +150,25 @@ func parseEquipment(m map[string]any) []Equipment {
 	return result
 }
 
-func parseRisks(m map[string]any) []string {
+func parseRisks(m map[string]any, lang string) []string {
+	locs := localesField(m)
 	var risks []string
-	locales, _ := m["locales"].([]any)
-	for _, l := range locales {
-		lm, ok := l.(map[string]any)
-		if !ok {
-			continue
-		}
-		if r, ok := lm["remarks"].(string); ok && r != "" {
-			risks = append(risks, r)
-		}
-		if r, ok := lm["risk"].(string); ok && r != "" {
-			risks = append(risks, r)
+	for _, field := range []string{"remarks", "risk"} {
+		if v := pickLocale(locs, lang, field); v != "" {
+			risks = append(risks, v)
 		}
 	}
 	if len(risks) == 0 {
-		risks = []string{"Vérifier les conditions météo avant de partir", "Emporter de quoi s'hydrater"}
+		if lang == "en" {
+			risks = []string{"Check weather conditions before departure", "Bring enough water"}
+		} else {
+			risks = []string{"Vérifier les conditions météo avant de partir", "Emporter de quoi s'hydrater"}
+		}
 	}
 	return risks
 }
 
-func parseAlternatives(m map[string]any) []AlternativeRoute {
+func parseAlternatives(m map[string]any, lang string) []AlternativeRoute {
 	alts := []AlternativeRoute{}
 	assoc, ok := m["associations"].(map[string]any)
 	if !ok {
@@ -223,20 +178,26 @@ func parseAlternatives(m map[string]any) []AlternativeRoute {
 	if !ok {
 		return alts
 	}
+	fallbackTitle := "Itinéraire alternatif"
+	fallbackReason := "Itinéraire alternatif"
+	if lang == "en" {
+		fallbackTitle = "Alternative route"
+		fallbackReason = "Alternative route"
+	}
 	for _, r := range routes {
 		rm, ok := r.(map[string]any)
 		if !ok {
 			continue
 		}
 		id := fmt.Sprintf("%.0f", floatField(rm, "document_id"))
-		title := firstLocaleTitle(rm)
+		title := pickLocale(localesField(rm), lang, "title")
 		if title == "" {
-			title = "Route alternative"
+			title = fallbackTitle
 		}
 		alts = append(alts, AlternativeRoute{
 			ID:     id,
 			Title:  title,
-			Reason: "Itinéraire alternatif",
+			Reason: fallbackReason,
 		})
 	}
 	return alts
@@ -319,4 +280,3 @@ func parseLatLon(m map[string]any) (lat, lon float64) {
 	lat = (2*math.Atan(math.Exp(y/R)) - math.Pi/2) * (180.0 / math.Pi)
 	return lat, lon
 }
-
