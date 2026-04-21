@@ -96,7 +96,7 @@ func TestGetDetail_ParsesTitle(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456")
+	d, err := GetDetail("123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestGetDetail_ParsesGeometry(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456")
+	d, err := GetDetail("123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestGetDetail_AlternativeRoutesNeverNull(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456")
+	d, err := GetDetail("123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestGetDetail_ParsesAlternativeRoutes(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456")
+	d, err := GetDetail("123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestGetDetail_ScheduleUsesNaismith(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456")
+	d, err := GetDetail("123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestGetDetail_ScheduleFromC2C(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456")
+	d, err := GetDetail("123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestGetDetail_APIError(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	_, err := GetDetail("999")
+	_, err := GetDetail("999", "fr")
 	if err == nil {
 		t.Fatal("expected error for failed API call, got nil")
 	}

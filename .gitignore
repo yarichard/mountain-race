@@ -9,3 +9,4 @@ backend/bin/
 .DS_Store
 backend/static/
 test/test-results
+server

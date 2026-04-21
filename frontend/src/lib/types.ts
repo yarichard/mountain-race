@@ -8,10 +8,21 @@ export interface RouteResult {
   title: string;
   summary: string;
   difficulty: string;
+  difficulty_color: string;
   elevation_gain: number;
   distance_km: number;
   source_url: string;
 }
+
+// Approximate French climbing grade equivalent for each alpine cotation.
+export const ALPINE_TO_CLIMBING: Record<string, string> = {
+  F: "3c",
+  PD: "4c",
+  AD: "5c",
+  D: "6b+",
+  TD: "7b",
+  ED: "8a+",
+};
 
 export interface Pitch {
   number: number;
@@ -103,4 +114,5 @@ export const CLIMBING_LEVELS = [
   "6a","6a+","6b","6b+","6c","6c+",
   "7a","7a+","7b","7b+","7c","7c+",
   "8a","8a+","8b","8b+","8c","8c+",
+  "9a","9b","9c",
 ] as const;
