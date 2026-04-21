@@ -51,7 +51,7 @@ function hasPermissiveObjective(objectives: string[]): boolean {
   return objectives.some((o) => o === "challenge" || o === "performance");
 }
 
-export function SearchPanel({ participants, objectives, onRouteSelected }: Props) {
+export function SearchPanel({ participants, objectives, onRouteSelected, onWeatherInvalidated, onDateChange }: Props) {
   const t = useTranslations("search");
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -246,7 +246,6 @@ export function SearchPanel({ participants, objectives, onRouteSelected }: Props
                 {results.map((r) => (
                   <div
                     key={r.id}
-                    data-testid="route-result"
                     className="border border-[var(--border)] rounded p-2 hover:border-[var(--primary)] hover:bg-[var(--surface-alt)] cursor-pointer transition"
                     onClick={() => { onRouteSelected(r.id, date); setResults(null); }}
                   >
