@@ -87,16 +87,7 @@ func pickLocale(locales []any, lang, field string) string {
 			}
 		}
 	}
-	// Fallback: first non-empty regardless of language.
-	for _, l := range locales {
-		lm, ok := l.(map[string]any)
-		if !ok {
-			continue
-		}
-		if v, ok := lm[field].(string); ok && v != "" {
-			return v
-		}
-	}
+
 	return ""
 }
 
