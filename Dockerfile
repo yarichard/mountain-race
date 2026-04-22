@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y libeccodes-dev && rm -rf /var/lib/apt/l
 WORKDIR /app
 COPY backend/ ./backend/
 WORKDIR /app/backend
-RUN CGO_ENABLED=1 go build -o /app/server .
+RUN go build -o /app/server .
 
 # ── Stage 2: Build frontend + assemble final image ───────────────────────────
 FROM node:24-slim AS final

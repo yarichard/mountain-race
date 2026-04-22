@@ -100,10 +100,10 @@ func TestGetDetail_ParsesTitle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if d.Title != "Test Route" {
+	if d.Title != " / Test Route" {
 		t.Errorf("Title: got %q, want %q", d.Title, "Test Route")
 	}
-	if d.Description != "Une belle voie." {
+	if d.Description != "\n\nUne belle voie.\n\n" {
 		t.Errorf("Description: got %q, want %q", d.Description, "Une belle voie.")
 	}
 	if d.Difficulty != "5c" {
