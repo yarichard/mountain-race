@@ -42,9 +42,10 @@ type RouteDetail struct {
 	Description       string             `json:"description"`
 	Difficulty        string             `json:"difficulty"`
 	ElevationGain     int                `json:"elevation_gain"`
-	DistanceKm        float64            `json:"distance_km"`
+	HeightDiffDown    int                `json:"height_diff_down"`
 	Lat               float64            `json:"lat"`
 	Lon               float64            `json:"lon"`
+	Track             [][2]float64       `json:"track,omitempty"` // WGS84 [lat, lon] pairs
 	Pitches           []Pitch            `json:"pitches,omitempty"`
 	TopoURL           string             `json:"topo_url"`
 	GpxURL            string             `json:"gpx_url"`
@@ -73,17 +74,18 @@ func GetDetail(id, lang string) (*RouteDetail, error) {
 	description += pickLocale(locs, lang, "external_resources")+ "\n"
 
 	difficulty := bestGrade(data)
-	elevGain := intField(data, "elevation_gain_up")
-	routeLen := floatField(data, "route_length") / 1000
+	elevGain := intField(data, "height_diff_up")
+	elevDown := intField(data, "height_diff_down")
 
 	pitches := parsePitches(data, lang)
 	equipment := parseEquipment(data, lang)
 	risks := parseRisks(data, lang)
 	alts := parseAlternatives(data, lang)
 	lat, lon := parseLatLon(data)
+	track := parseTrack(data)
 
 	// Schedule: check if C2C has duration data in comments/description
-	sched := parseSchedule(data, routeLen, float64(elevGain))
+	sched := parseSchedule(data, float64(elevGain))
 
 	// Topo and GPX
 	topoURL := firstImageURL(data)
@@ -100,9 +102,10 @@ func GetDetail(id, lang string) (*RouteDetail, error) {
 		Description:       description,
 		Difficulty:        difficulty,
 		ElevationGain:     elevGain,
-		DistanceKm:        routeLen,
+		HeightDiffDown:    elevDown,
 		Lat:               lat,
 		Lon:               lon,
+		Track:             track,
 		Pitches:           pitches,
 		TopoURL:           topoURL,
 		GpxURL:            gpxURL,
@@ -203,7 +206,7 @@ func parseAlternatives(m map[string]any, lang string) []AlternativeRoute {
 	return alts
 }
 
-func parseSchedule(m map[string]any, distanceKm, elevGainM float64) Schedule {
+func parseSchedule(m map[string]any, elevGainM float64) Schedule {
 	// Look for duration in locales
 	locales, _ := m["locales"].([]any)
 	for _, l := range locales {
@@ -211,7 +214,6 @@ func parseSchedule(m map[string]any, distanceKm, elevGainM float64) Schedule {
 		if !ok {
 			continue
 		}
-		// C2C sometimes has time_required field
 		if d, ok := lm["time_required"].(string); ok && d != "" {
 			return Schedule{
 				EstimatedDurationHours: 6,
@@ -222,15 +224,12 @@ func parseSchedule(m map[string]any, distanceKm, elevGainM float64) Schedule {
 		}
 	}
 
-	// Naismith fallback
-	duration := (distanceKm / 5.0) + (elevGainM / 600.0)
+	// Naismith fallback: elevation only
+	duration := elevGainM / 600.0
 	if duration < 1 {
 		duration = 4
 	}
-	endHour := 6 + int(duration)
-	if endHour > 20 {
-		endHour = 20
-	}
+	endHour := min(6+int(duration), 20)
 
 	return Schedule{
 		EstimatedDurationHours: duration,
@@ -257,8 +256,15 @@ func firstImageURL(m map[string]any) string {
 	return ""
 }
 
-// parseLatLon extracts WGS84 coordinates from the C2C geometry field.
-// C2C stores geometry as a stringified GeoJSON Point in EPSG:3857 (Web Mercator).
+// webMercatorToWGS84 converts EPSG:3857 (x, y) to WGS84 (lat, lon).
+func webMercatorToWGS84(x, y float64) (lat, lon float64) {
+	const R = 6378137.0
+	lon = x / R * (180.0 / math.Pi)
+	lat = (2*math.Atan(math.Exp(y/R)) - math.Pi/2) * (180.0 / math.Pi)
+	return lat, lon
+}
+
+// parseLatLon extracts WGS84 coordinates from the C2C geometry Point field.
 func parseLatLon(m map[string]any) (lat, lon float64) {
 	geomObj, ok := m["geometry"].(map[string]any)
 	if !ok {
@@ -274,9 +280,30 @@ func parseLatLon(m map[string]any) (lat, lon float64) {
 	if err := json.Unmarshal([]byte(geomStr), &geojson); err != nil {
 		return 0, 0
 	}
-	x, y := geojson.Coordinates[0], geojson.Coordinates[1]
-	const R = 6378137.0
-	lon = x / R * (180.0 / math.Pi)
-	lat = (2*math.Atan(math.Exp(y/R)) - math.Pi/2) * (180.0 / math.Pi)
-	return lat, lon
+	return webMercatorToWGS84(geojson.Coordinates[0], geojson.Coordinates[1])
+}
+
+// parseTrack extracts the route line from the C2C geometry geom_detail field.
+// Returns WGS84 [lat, lon] pairs.
+func parseTrack(m map[string]any) [][2]float64 {
+	geomObj, ok := m["geometry"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	detailStr, ok := geomObj["geom_detail"].(string)
+	if !ok || detailStr == "" {
+		return nil
+	}
+	var geojson struct {
+		Coordinates [][2]float64 `json:"coordinates"`
+	}
+	if err := json.Unmarshal([]byte(detailStr), &geojson); err != nil {
+		return nil
+	}
+	track := make([][2]float64, len(geojson.Coordinates))
+	for i, c := range geojson.Coordinates {
+		lat, lon := webMercatorToWGS84(c[0], c[1])
+		track[i] = [2]float64{lat, lon}
+	}
+	return track
 }

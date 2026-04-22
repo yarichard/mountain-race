@@ -10,13 +10,14 @@ import (
 )
 
 type searchRequest struct {
-	Location     string                   `json:"location"`
-	LocationType string                   `json:"location_type"`
-	RaceType     string                   `json:"race_type"`
-	Difficulty   string                   `json:"difficulty"`
-	Date         string                   `json:"date"`
+	Location     string                  `json:"location"`
+	LocationType string                  `json:"location_type"`
+	RaceType     string                  `json:"race_type"`
+	Difficulty   string                  `json:"difficulty"`
+	Date         string                  `json:"date"`
 	Participants []camptocamp.Participant `json:"participants"`
-	AllowAbove   bool                     `json:"allow_above"`
+	AllowAbove   bool                    `json:"allow_above"`
+	RadiusKm     int                     `json:"radius_km"`
 }
 
 // preferredLang extracts the primary language code from an Accept-Language header value.
@@ -50,6 +51,7 @@ func SearchRoutes(c *gin.Context) {
 		AllowAbove:   req.AllowAbove,
 		Lang:         lang,
 		Participants: req.Participants,
+		RadiusKm:     req.RadiusKm,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

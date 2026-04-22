@@ -53,6 +53,7 @@
       "name": "Nom",
       "location": "Lieu"
     },
+    "radius": "Rayon (km)",
     "allowAbove": "Inclure les niveaux supérieurs",
     "search": "Rechercher",
     "searching": "Recherche...",

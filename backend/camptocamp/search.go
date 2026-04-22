@@ -83,14 +83,14 @@ func colorFromIndices(routeIdx, diffIdx int) string {
 
 // SearchResult is a lightweight route summary.
 type SearchResult struct {
-	ID              string  `json:"id"`
-	Title           string  `json:"title"`
-	Summary         string  `json:"summary"`
-	Difficulty      string  `json:"difficulty"`
-	DifficultyColor string  `json:"difficulty_color"`
-	ElevationGain   int     `json:"elevation_gain"`
-	DistanceKm      float64 `json:"distance_km"`
-	SourceURL       string  `json:"source_url"`
+	ID              string `json:"id"`
+	Title           string `json:"title"`
+	Summary         string `json:"summary"`
+	Difficulty      string `json:"difficulty"`
+	DifficultyColor string `json:"difficulty_color"`
+	HeightDiffUp    int    `json:"height_diff_up"`
+	HeightDiffDown  int    `json:"height_diff_down"`
+	SourceURL       string `json:"source_url"`
 }
 
 // Participant holds a single person's details.
@@ -109,6 +109,7 @@ type SearchRequest struct {
 	Date         string        `json:"date"`
 	Lang         string        `json:"lang"` // preferred display language, e.g. "fr" or "en"
 	Participants []Participant `json:"participants"`
+	RadiusKm     int           `json:"radius_km"` // search radius in km for location-based search (default 20)
 }
 
 // Search queries CampToCamp for routes matching the criteria.
@@ -127,8 +128,12 @@ func Search(req SearchRequest) ([]SearchResult, error) {
 		lat, lon, err := geocodeLocation(req.Location)
 		if err == nil {
 			x, y := wgs84ToMercator(lat, lon)
-			const radius = 20000.0 // 20 km
-			params.Set("bbox", fmt.Sprintf("%.0f,%.0f,%.0f,%.0f", x-radius, y-radius, x+radius, y+radius))
+			radiusKm := req.RadiusKm
+			if radiusKm <= 0 {
+				radiusKm = 20
+			}
+			radiusM := float64(radiusKm) * 1000.0
+			params.Set("bbox", fmt.Sprintf("%.0f,%.0f,%.0f,%.0f", x-radiusM, y-radiusM, x+radiusM, y+radiusM))
 		}
 	} else if req.Location != "" {
 		params.Set("q", req.Location)
@@ -149,6 +154,7 @@ func Search(req SearchRequest) ([]SearchResult, error) {
 		id := fmt.Sprintf("%.0f", floatField(m, "document_id"))
 		locs := localesField(m)
 		title := pickLocale(locs, req.Lang, "title")
+		title += "("+ pickLocale(locs, req.Lang, "title_prefix") +")"
 		difficulty, color := gradeFromDoc(m, req.RaceType, req.Difficulty)
 		if color == "red" && !req.AllowAbove {
 			continue // route is harder than the selected difficulty
@@ -159,8 +165,8 @@ func Search(req SearchRequest) ([]SearchResult, error) {
 			Summary:         pickLocale(locs, req.Lang, "summary"),
 			Difficulty:      difficulty,
 			DifficultyColor: color,
-			ElevationGain:   intField(m, "elevation_gain_up"),
-			DistanceKm:      floatField(m, "route_length") / 1000,
+			HeightDiffUp:    intField(m, "height_diff_up"),
+			HeightDiffDown:  intField(m, "height_diff_down"),
 			SourceURL:       "https://www.camptocamp.org/routes/" + id,
 		})
 	}

@@ -17,14 +17,14 @@ interface Props {
 
 type Tab = "map" | "elevation" | "topo";
 
-// Synthetic elevation profile from route data (real GPX not decoded yet)
-function makeSyntheticProfile(elevGain: number, distKm: number) {
+// Synthetic elevation profile from elevation gain (real GPX not decoded yet)
+function makeSyntheticProfile(elevGain: number) {
   const points = 20;
   return Array.from({ length: points }, (_, i) => {
     const t = i / (points - 1);
     const bell = Math.sin(t * Math.PI);
     return {
-      distance: (t * distKm).toFixed(1),
+      point: i + 1,
       elevation: Math.round(1000 + bell * elevGain),
     };
   });
@@ -49,7 +49,7 @@ export function DetailPanel({ route, loading }: Props) {
     );
   }
 
-  const elevData = makeSyntheticProfile(route.elevation_gain, route.distance_km);
+  const elevData = makeSyntheticProfile(route.elevation_gain);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "topo", label: t("topo") },
@@ -119,7 +119,7 @@ export function DetailPanel({ route, loading }: Props) {
         )}
         {tab === "map" && (
           <div className="h-64">
-            <MapView lat={route.lat || 45.9} lon={route.lon || 6.9} />
+            <MapView lat={route.lat || 45.9} lon={route.lon || 6.9} track={route.track} />
           </div>
         )}
         {tab === "elevation" && (
@@ -132,7 +132,7 @@ export function DetailPanel({ route, loading }: Props) {
                     <stop offset="95%" stopColor="#1F2782" stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="distance" tick={{ fontSize: 10 }} label={{ value: "km", position: "insideRight", offset: -5, fontSize: 10 }} />
+                <XAxis dataKey="point" tick={false} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(v) => [`${v} m`, "Altitude"]} />
                 <Area type="monotone" dataKey="elevation" stroke="#1F2782" fill="url(#elevGrad)" strokeWidth={2} dot={false} />

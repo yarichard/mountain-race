@@ -58,7 +58,7 @@ const MOCK_ROUTE_DETAIL = {
   description: "Belle arête mixte au-dessus de Chamonix.",
   difficulty: "AD",
   elevation_gain: 300,
-  distance_km: 2.5,
+  height_diff_down: 280,
   lat: 45.87,
   lon: 6.88,
   pitches: [],
@@ -163,7 +163,8 @@ describe("User flow: search and select a route", () => {
     await waitFor(() =>
       expect(screen.getByText("Arête des Cosmiques")).toBeInTheDocument()
     );
-    expect(screen.getByText("↑300m · 2.5km")).toBeInTheDocument();
+    expect(screen.getByText("↑300m")).toBeInTheDocument();
+    expect(screen.getByText("2.5km")).toBeInTheDocument();
   });
 
   it("shows loading spinner in detail panel while fetching route", async () => {
@@ -311,6 +312,27 @@ describe("User flow: search and select a route", () => {
       ([url]: [string]) => typeof url === "string" && url.startsWith("/api/weather")
     ).length;
     expect(weatherCalls).toBe(0);
+  });
+
+  it("launching a new search clears detail, weather, and all route-derived panels", async () => {
+    mockFetch();
+    renderApp();
+
+    // Search and select a route so all panels populate
+    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+    await waitFor(() => expect(screen.getByText("Arête des Cosmiques")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Arête des Cosmiques"));
+    await waitFor(() =>
+      expect(screen.getByText("Belle arête mixte au-dessus de Chamonix.")).toBeInTheDocument()
+    );
+    await waitFor(() => expect(screen.getByText("-2°C")).toBeInTheDocument());
+
+    // Launch a new search — all panels should immediately return to empty state
+    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+
+    expect(screen.getByText("Select a route to see details")).toBeInTheDocument();
+    expect(screen.getByText("Select a route to see weather")).toBeInTheDocument();
+    expect(screen.queryByText("Belle arête mixte au-dessus de Chamonix.")).toBeNull();
   });
 
   it("shows no results message when search returns empty list", async () => {

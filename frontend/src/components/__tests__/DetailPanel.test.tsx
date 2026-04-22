@@ -26,7 +26,7 @@ const mockRoute: RouteDetail = {
   description: "Belle voie sur granit.",
   difficulty: "5c",
   elevation_gain: 400,
-  distance_km: 3.2,
+  height_diff_down: 400,
   lat: 45.9,
   lon: 6.9,
   pitches: [

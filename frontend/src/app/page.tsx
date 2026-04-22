@@ -47,8 +47,15 @@ export default function Home() {
     }
   };
 
-  // Called when a new search is launched: mark weather stale so the next route selection refreshes it
-  const handleWeatherInvalidated = () => { weatherStale.current = true; };
+  // Called when a new search is launched: clear route (Part 5) and weather (Part 3)
+  const handleWeatherInvalidated = () => {
+    setRoute(null);
+    setLoadingRoute(false);
+    setWeather(null);
+    setWeatherError(false);
+    setLoadingWeather(false);
+    weatherStale.current = true;
+  };
 
   const handleRouteSelected = async (id: string, date: string) => {
     setRoute(null);
