@@ -1,11 +1,26 @@
 package camptocamp
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+
+	"mountain-race/llm"
 )
+
+func TestMain(m *testing.M) {
+	// Stub LLM extraction so detail tests don't need a real Ollama instance.
+	equipExtract = func(_ context.Context, gearText, _ string) ([]llm.EquipmentItem, error) {
+		if gearText == "" {
+			return nil, nil
+		}
+		return []llm.EquipmentItem{{Name: "Stub item", Quantity: 1, Notes: "mandatory"}}, nil
+	}
+	os.Exit(m.Run())
+}
 
 // mockDetail is kept here for test use only.
 func mockDetail(id string) *RouteDetail {
@@ -96,7 +111,7 @@ func TestGetDetail_ParsesTitle(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456", "fr")
+	d, err := GetDetail(context.Background(), "123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -122,7 +137,7 @@ func TestGetDetail_ParsesGeometry(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456", "fr")
+	d, err := GetDetail(context.Background(), "123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -144,7 +159,7 @@ func TestGetDetail_AlternativeRoutesNeverNull(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456", "fr")
+	d, err := GetDetail(context.Background(), "123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -161,7 +176,7 @@ func TestGetDetail_ParsesAlternativeRoutes(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456", "fr")
+	d, err := GetDetail(context.Background(), "123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -179,7 +194,7 @@ func TestGetDetail_ScheduleUsesNaismith(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456", "fr")
+	d, err := GetDetail(context.Background(), "123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -206,7 +221,7 @@ func TestGetDetail_ScheduleFromC2C(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	d, err := GetDetail("123456", "fr")
+	d, err := GetDetail(context.Background(), "123456", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -222,7 +237,7 @@ func TestGetDetail_APIError(t *testing.T) {
 	defer srv.Close()
 	baseURL = srv.URL
 
-	_, err := GetDetail("999", "fr")
+	_, err := GetDetail(context.Background(), "999", "fr")
 	if err == nil {
 		t.Fatal("expected error for failed API call, got nil")
 	}

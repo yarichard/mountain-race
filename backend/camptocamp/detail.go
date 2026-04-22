@@ -1,10 +1,18 @@
 package camptocamp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
+
+	"mountain-race/llm"
 )
+
+// equipExtract can be replaced in tests to avoid a real Ollama call.
+var equipExtract = func(ctx context.Context, gearText, lang string) ([]llm.EquipmentItem, error) {
+	return llm.ExtractEquipment(ctx, gearText, lang)
+}
 
 // Pitch represents a single pitch on a multipitch route.
 type Pitch struct {
@@ -57,7 +65,7 @@ type RouteDetail struct {
 }
 
 // GetDetail fetches full route detail from CampToCamp.
-func GetDetail(id, lang string) (*RouteDetail, error) {
+func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 	data, err := get("/routes/" + id)
 	if err != nil {
 		return nil, err
@@ -66,19 +74,29 @@ func GetDetail(id, lang string) (*RouteDetail, error) {
 	locs := localesField(data)
 	title := pickLocale(locs, lang, "title_prefix") + " / " + pickLocale(locs, lang, "title")
 	description := pickLocale(locs, lang, "route_history") + "\n"
-	description += pickLocale(locs, lang, "summary")+ "\n"
-	description += pickLocale(locs, lang, "description")+ "\n"
+	description += pickLocale(locs, lang, "summary") + "\n"
+	description += pickLocale(locs, lang, "description") + "\n"
 	if description == "" {
-		description = pickLocale(locs, lang, "route_history")+ "\n"
+		description = pickLocale(locs, lang, "route_history") + "\n"
 	}
-	description += pickLocale(locs, lang, "external_resources")+ "\n"
+	description += pickLocale(locs, lang, "external_resources") + "\n"
 
 	difficulty := bestGrade(data)
 	elevGain := intField(data, "height_diff_up")
 	elevDown := intField(data, "height_diff_down")
 
 	pitches := parsePitches(data, lang)
-	equipment := parseEquipment(data, lang)
+
+	gearText := extractGearText(data, lang)
+	llmItems, err := equipExtract(ctx, gearText, lang)
+	if err != nil {
+		return nil, fmt.Errorf("equipment parsing failed: %w", err)
+	}
+	equipment := make([]Equipment, len(llmItems))
+	for i, item := range llmItems {
+		equipment[i] = Equipment{Item: item.Name, Quantity: item.Quantity, Notes: item.Notes}
+	}
+
 	risks := parseRisks(data, lang)
 	alts := parseAlternatives(data, lang)
 	lat, lon := parseLatLon(data)
@@ -135,22 +153,15 @@ func parsePitches(m map[string]any, lang string) []Pitch {
 	return []Pitch{{Number: 1, Grade: bestGrade(m), Description: pitchText}}
 }
 
-func parseEquipment(m map[string]any, lang string) []Equipment {
-	var result []Equipment
-
-	if gearText := pickLocale(localesField(m), lang, "gear"); gearText != "" {
-		result = append(result, Equipment{Item: gearText, Quantity: 1, Notes: ""})
+// extractGearText returns the raw gear description text from the C2C document.
+func extractGearText(m map[string]any, lang string) string {
+	if text := pickLocale(localesField(m), lang, "gear"); text != "" {
+		return text
 	}
-
-	// equipment_rating
 	if er := stringField(m, "equipment_rating"); er != "" {
-		result = append(result, Equipment{Item: "Équipement", Quantity: 1, Notes: er})
+		return er
 	}
-
-	if len(result) == 0 {
-		result = []Equipment{{Item: "Matériel standard", Quantity: 1, Notes: "Voir description de la voie"}}
-	}
-	return result
+	return ""
 }
 
 func parseRisks(m map[string]any, lang string) []string {
