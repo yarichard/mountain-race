@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import ReactMarkdown from "react-markdown";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { RouteDetail } from "@/lib/types";
 import { LoadingSpinner } from "./LoadingSpinner";
@@ -113,7 +114,9 @@ export function DetailPanel({ route, loading }: Props) {
                 </tbody>
               </table>
             ) : (
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{route.description}</p>
+              <div className="text-sm leading-relaxed prose prose-sm max-w-none">
+                <ReactMarkdown>{route.description}</ReactMarkdown>
+              </div>
             )}
           </div>
         )}

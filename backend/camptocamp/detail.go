@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
+	"strings"
 
 	"mountain-race/llm"
 )
@@ -80,6 +82,23 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 		description = pickLocale(locs, lang, "route_history") + "\n"
 	}
 	description += pickLocale(locs, lang, "external_resources") + "\n"
+
+	// CamptoCamp specific: some descriptions have "##" without space
+	description = strings.Replace(description, "##", "## ", -1)
+	// replace all "L#" occurences and replace # with L and an index beginning at 1 and increasing for each occurence.
+	pitchIndex := 1
+	description = regexp.MustCompile(`L#`).ReplaceAllStringFunc(description, func(s string) string {
+		result := fmt.Sprintf("\n**L%d** ", pitchIndex)
+		pitchIndex++
+		return result
+	})
+	// replace all "L#" occurences and replace # with L and an index beginning at 1 and increasing for each occurence.
+	relayIndex := 1
+	description = regexp.MustCompile(`R#`).ReplaceAllStringFunc(description, func(s string) string {
+		result := fmt.Sprintf("R%d", relayIndex)
+		relayIndex++
+		return result
+	})
 
 	difficulty := bestGrade(data)
 	elevGain := intField(data, "height_diff_up")
