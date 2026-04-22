@@ -8,10 +8,8 @@ const config: Config = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
+    "^react-markdown$": "<rootDir>/src/__mocks__/react-markdown.tsx",
   },
-  transformIgnorePatterns: [
-    "/node_modules/(?!(next-intl|use-intl)/)",
-  ],
 };
 
 export default createJestConfig(config);
