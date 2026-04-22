@@ -55,9 +55,10 @@ export interface RouteDetail {
   description: string;
   difficulty: string;
   elevation_gain: number;
-  distance_km: number;
+  height_diff_down: number;
   lat: number;
   lon: number;
+  track?: [number, number][]; // WGS84 [lat, lon] pairs
   pitches: Pitch[];
   topo_url: string;
   gpx_url: string;

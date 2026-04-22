@@ -59,6 +59,7 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
   const [difficulty, setDifficulty] = useState("5c");
   const [location, setLocation] = useState("");
   const [locationType, setLocationType] = useState<"name" | "location">("name");
+  const [radiusKm, setRadiusKm] = useState(20);
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<RouteResult[] | null>(null);
   const [allowAbove, setAllowAbove] = useState(() =>
@@ -111,6 +112,7 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
           difficulty,
           allow_above: allowAbove,
           date,
+          radius_km: locationType === "location" ? radiusKm : undefined,
           participants: participants.map((p) => ({
             name: p.name,
             climbing_level: p.climbingLevel,
@@ -226,6 +228,21 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
           />
         </div>
 
+        {/* Radius — only for area/location mode */}
+        {locationType === "location" && (
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-muted)] mb-0.5">{t("radius")}</label>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              className="w-full border border-[var(--border)] rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+              value={radiusKm}
+              onChange={(e) => setRadiusKm(Math.max(1, parseInt(e.target.value, 10) || 1))}
+            />
+          </div>
+        )}
+
         {/* Search button */}
         <button
           onClick={search}
@@ -257,7 +274,9 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
                       </span>
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                      ↑{r.elevation_gain}m · {r.distance_km.toFixed(1)}km
+                      <span className="text-green-600">↑{r.elevation_gain}m</span>
+                      {" · "}
+                      <span>{r.distance_km}km</span>
                     </p>
                   </div>
                 ))}

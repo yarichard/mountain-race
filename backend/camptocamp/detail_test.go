@@ -14,9 +14,9 @@ func mockDetail(id string) *RouteDetail {
 		Title:       "Aiguille de l'Index — Voie normale (mock)",
 		Description: "Belle voie classique accessible depuis l'Aiguille du Midi.",
 		Difficulty:  "4c",
-		ElevationGain: 650,
-		DistanceKm:    4.2,
-		Lat:           45.9,
+		ElevationGain:  650,
+		HeightDiffDown: 400,
+		Lat:            45.9,
 		Lon:           6.9,
 		Pitches: []Pitch{
 			{Number: 1, Grade: "4a", Description: "Dalle initiale, prises évidentes."},
@@ -58,9 +58,9 @@ func c2cDetailServer(t *testing.T, doc map[string]any) *httptest.Server {
 func minimalRouteDoc(overrides map[string]any) map[string]any {
 	doc := map[string]any{
 		"document_id":     float64(123456),
-		"climbing_rating": "5c",
-		"elevation_gain_up": float64(650),
-		"route_length":    float64(4200),
+		"climbing_rating":  "5c",
+		"height_diff_up":   float64(650),
+		"height_diff_down": float64(400),
 		"locales": []any{
 			map[string]any{
 				"lang":        "fr",
@@ -112,8 +112,8 @@ func TestGetDetail_ParsesTitle(t *testing.T) {
 	if d.ElevationGain != 650 {
 		t.Errorf("ElevationGain: got %d, want 650", d.ElevationGain)
 	}
-	if d.DistanceKm != 4.2 {
-		t.Errorf("DistanceKm: got %f, want 4.2", d.DistanceKm)
+	if d.HeightDiffDown != 400 {
+		t.Errorf("HeightDiffDown: got %d, want 400", d.HeightDiffDown)
 	}
 }
 
