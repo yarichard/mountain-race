@@ -65,7 +65,7 @@ func SearchRoutes(c *gin.Context) {
 func GetRoute(c *gin.Context) {
 	id := c.Param("id")
 	lang := preferredLang(c.GetHeader("Accept-Language"))
-	detail, err := camptocamp.GetDetail(id, lang)
+	detail, err := camptocamp.GetDetail(c.Request.Context(), id, lang)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
