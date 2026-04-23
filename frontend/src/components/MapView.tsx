@@ -6,11 +6,10 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
 const icon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+  iconUrl: "/mountain-climb.svg",
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
+  popupAnchor: [0, -36],
 });
 
 function FitBounds({ track }: { track: [number, number][] }) {
@@ -42,15 +41,14 @@ export default function MapView({ lat, lon, track }: Props) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {hasTrack ? (
+      <Marker position={[lat, lon]} icon={icon}>
+        <Popup>Point de départ</Popup>
+      </Marker>
+      {hasTrack && (
         <>
           <Polyline positions={track} color="#1F2782" weight={3} opacity={0.85} />
           <FitBounds track={track} />
         </>
-      ) : (
-        <Marker position={[lat, lon]} icon={icon}>
-          <Popup>Point de départ</Popup>
-        </Marker>
       )}
     </MapContainer>
   );
