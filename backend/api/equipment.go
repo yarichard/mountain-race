@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -18,6 +19,11 @@ func ExtractEquipment(c *gin.Context) {
 	var req extractEquipmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if strings.TrimSpace(req.GearText) == "" {
+		c.JSON(http.StatusOK, gin.H{"equipment": []camptocamp.Equipment{}})
 		return
 	}
 

@@ -50,6 +50,7 @@ export default function Home() {
   };
 
   const fetchEquipment = async (gearTextValue: string) => {
+    if (!gearTextValue.trim()) { setEquipment([]); return; }
     setEquipment(null);
     const res = await fetch("/api/equipment/extract", {
       method: "POST",
@@ -156,7 +157,7 @@ export default function Home() {
           gridTemplateRows: "auto 1fr auto auto",
           gridTemplateAreas: `
             "p1  top-mid   p3"
-            "p1  p5        p6"
+            "p9  p5        p6"
             "p9  p5        p6"
             ".   bot-mid   p6"
           `,
