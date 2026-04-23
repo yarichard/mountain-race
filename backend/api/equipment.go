@@ -22,7 +22,7 @@ func ExtractEquipment(c *gin.Context) {
 	}
 
 	lang := preferredLang(c.GetHeader("Accept-Language"))
-	items, err := llm.ExtractEquipment(c.Request.Context(), req.GearText, lang)
+	items, err := llm.ExtractEquipmentGemini(c.Request.Context(), req.GearText, lang)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
