@@ -27,7 +27,7 @@ func TestExtractEquipment_ParsesValidJSON(t *testing.T) {
 [{"name":"Corde 60m","quantity":1,"notes":"mandatory"},{"name":"Dégaines","quantity":12,"notes":"mandatory"},{"name":"Casque","quantity":1,"notes":"mandatory"}]`)
 	defer srv.Close()
 
-	items, err := ExtractEquipment(context.Background(), "Corde 60m, 12 dégaines, casque obligatoire", "fr")
+	items, err := ExtractEquipmentOllama(context.Background(), "Corde 60m, 12 dégaines, casque obligatoire", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestExtractEquipment_ParsesValidJSON(t *testing.T) {
 }
 
 func TestExtractEquipment_EmptyGearText(t *testing.T) {
-	items, err := ExtractEquipment(context.Background(), "", "fr")
+	items, err := ExtractEquipmentOllama(context.Background(), "", "fr")
 	if err != nil {
 		t.Fatalf("unexpected error for empty gear text: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestExtractEquipment_OllamaUnreachable(t *testing.T) {
 	os.Setenv("OLLAMA_URL", "http://127.0.0.1:1") // nothing listening here
 	defer os.Unsetenv("OLLAMA_URL")
 
-	_, err := ExtractEquipment(context.Background(), "some gear", "fr")
+	_, err := ExtractEquipmentOllama(context.Background(), "some gear", "fr")
 	if err == nil {
 		t.Fatal("expected error when ollama is unreachable, got nil")
 	}
@@ -69,7 +69,7 @@ func TestExtractEquipment_InvalidJSONResponse(t *testing.T) {
 	srv := mockOllamaServer(t, "Sorry, I cannot parse this.")
 	defer srv.Close()
 
-	_, err := ExtractEquipment(context.Background(), "some gear", "fr")
+	_, err := ExtractEquipmentOllama(context.Background(), "some gear", "fr")
 	if err == nil {
 		t.Fatal("expected error when LLM returns no JSON array, got nil")
 	}
@@ -88,7 +88,7 @@ func TestExtractEquipment_EnglishLang(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("OLLAMA_URL", srv.URL)
 
-	items, err := ExtractEquipment(context.Background(), "60m rope", "en")
+	items, err := ExtractEquipmentOllama(context.Background(), "60m rope", "en")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
