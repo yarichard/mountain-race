@@ -60,6 +60,7 @@ export interface RouteDetail {
   lon: number;
   track?: [number, number][]; // WGS84 [lat, lon] pairs
   elevation_profile?: [number, number][]; // [distance_km, elevation_m] pairs
+  gear_text: string;
   pitches: Pitch[];
   topo_url: string;
   gpx_url: string;

@@ -1,13 +1,16 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { RouteDetail } from "@/lib/types";
+import type { Equipment, RouteDetail } from "@/lib/types";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 interface Props {
   route: RouteDetail | null;
+  equipment: Equipment[] | null; // null = loading, [] = empty/failed
+  gearText?: string;             // shown when LLM extraction failed
 }
 
-export function EquipmentPanel({ route }: Props) {
+export function EquipmentPanel({ route, equipment, gearText }: Props) {
   const t = useTranslations("equipment");
 
   if (!route) {
@@ -16,6 +19,29 @@ export function EquipmentPanel({ route }: Props) {
         <div className="panel-header">{t("title")}</div>
         <div className="panel-body flex-1 flex items-center justify-center text-sm text-[var(--text-muted)] text-center">
           {t("empty")}
+        </div>
+      </div>
+    );
+  }
+
+  if (equipment === null) {
+    return (
+      <div className="panel flex flex-col h-full">
+        <div className="panel-header">{t("title")}</div>
+        <div className="panel-body flex-1 flex items-center justify-center">
+          <LoadingSpinner message={t("loading")} />
+        </div>
+      </div>
+    );
+  }
+
+  if (equipment.length === 0 && gearText) {
+    return (
+      <div className="panel flex flex-col h-full">
+        <div className="panel-header">{t("title")}</div>
+        <div className="panel-body flex-1 overflow-y-auto">
+          <p className="text-xs text-[var(--text-muted)] italic mb-2">{t("extractionFailed")}</p>
+          <p className="text-sm whitespace-pre-wrap">{gearText}</p>
         </div>
       </div>
     );
@@ -34,7 +60,7 @@ export function EquipmentPanel({ route }: Props) {
             </tr>
           </thead>
           <tbody>
-            {route.equipment.map((eq, i) => (
+            {equipment.map((eq, i) => (
               <tr key={i} className="border-t border-[var(--border)]">
                 <td className="py-1 pr-2 font-medium">{eq.item}</td>
                 <td className="py-1 pr-2 text-center text-[var(--primary)] font-bold">{eq.quantity}</td>

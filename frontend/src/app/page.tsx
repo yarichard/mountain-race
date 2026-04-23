@@ -11,7 +11,7 @@ import { RisksPanel } from "@/components/RisksPanel";
 import { AlternativesPanel } from "@/components/AlternativesPanel";
 import { SchedulePanel } from "@/components/SchedulePanel";
 import { EquipmentPanel } from "@/components/EquipmentPanel";
-import type { Participant, RouteDetail, WeatherData } from "@/lib/types";
+import type { Equipment, Participant, RouteDetail, WeatherData } from "@/lib/types";
 
 export default function Home() {
   const t = useTranslations();
@@ -23,6 +23,8 @@ export default function Home() {
   const [notes, setNotes] = useState("");
   const [route, setRoute] = useState<RouteDetail | null>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
+  const [equipment, setEquipment] = useState<Equipment[] | null>(null);
+  const [gearText, setGearText] = useState<string | undefined>(undefined);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loadingWeather, setLoadingWeather] = useState(false);
   const [weatherError, setWeatherError] = useState(false);
@@ -47,6 +49,21 @@ export default function Home() {
     }
   };
 
+  const fetchEquipment = async (gearTextValue: string) => {
+    setEquipment(null);
+    const res = await fetch("/api/equipment/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gear_text: gearTextValue }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setEquipment(data.equipment ?? []);
+    } else {
+      setEquipment([]);
+    }
+  };
+
   // Called when a new search is launched: clear route (Part 5) and weather (Part 3)
   const handleWeatherInvalidated = () => {
     setRoute(null);
@@ -54,17 +71,26 @@ export default function Home() {
     setWeather(null);
     setWeatherError(false);
     setLoadingWeather(false);
+    setEquipment(null);
+    setGearText(undefined);
     weatherStale.current = true;
   };
 
   const handleRouteSelected = async (id: string, date: string) => {
     setRoute(null);
+    setEquipment(null);
+    setGearText(undefined);
     setLoadingRoute(true);
     const routeRes = await fetch(`/api/routes/${id}`);
     if (!routeRes.ok) { setLoadingRoute(false); return; }
-    const routeData = await routeRes.json();
+    const routeData: RouteDetail = await routeRes.json();
     setRoute(routeData);
     setLoadingRoute(false);
+
+    // Fire gear extraction independently — does not block route display
+    const gt = routeData.gear_text ?? "";
+    setGearText(gt);
+    void fetchEquipment(gt);
 
     if (!weatherStale.current) return;
     weatherStale.current = false;
@@ -144,7 +170,7 @@ export default function Home() {
 
         {/* Part 9: Equipment — col 1, row 4 */}
         <div style={{ gridArea: "p9" }} className="min-h-0">
-          <EquipmentPanel route={route} />
+          <EquipmentPanel route={route} equipment={equipment} gearText={gearText} />
         </div>
 
         {/* Top-mid: Part 2 + Part 4 side-by-side */}
