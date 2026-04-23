@@ -24,12 +24,6 @@ export const ALPINE_TO_CLIMBING: Record<string, string> = {
   ED: "8a+",
 };
 
-export interface Pitch {
-  number: number;
-  grade: string;
-  description: string;
-}
-
 export interface Equipment {
   item: string;
   quantity: number;
@@ -61,7 +55,6 @@ export interface RouteDetail {
   track?: [number, number][]; // WGS84 [lat, lon] pairs
   elevation_profile?: [number, number][]; // [distance_km, elevation_m] pairs
   gear_text: string;
-  pitches: Pitch[];
   images?: string[];
   gpx_url: string;
   equipment: Equipment[];
