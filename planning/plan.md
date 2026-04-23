@@ -218,7 +218,7 @@ Two services:
 | `alternative_routes` never serialises as null | ✅ |
 | Map uses real GPS coordinates from C2C | ✅ |
 | Weather uses route GPS (not hardcoded) | ✅ page.tsx fetches route first then calls `/api/weather` with route `lat`/`lon` and search date |
-| Elevation profile uses real GPX data | ⬜ TODO: currently synthetic (Naismith-shaped curve); needs GPX decoding |
+| Elevation profile uses real GPX data | ⬜ TODO: query OpenTopoData API with track points |
 | GRIB2 weather decoding | ✅ implemented with `nilsmagnus/grib` (pure Go) |
 | Frontend unit tests (React Testing Library) | ⬜ |
 | E2E tests (Playwright) | ⬜ |
@@ -228,6 +228,11 @@ Two services:
 
 ## Known Limitations & TODOs
 
-1. **Elevation profile is synthetic**: `DetailPanel.tsx` generates a bell-curve profile from elevation gain and distance. Real GPX track decoding is not yet implemented.
+1. **Elevation profile is synthetic**: `DetailPanel.tsx` generates a bell-curve profile from elevation gain and distance. To implement the real profile:
+   - **Source**: C2C `geom_detail` contains 2D-only Web Mercator coordinates — no Z value. Elevation must be fetched separately.
+   - **API**: OpenTopoData public instance (`https://api.opentopodata.org/v1/srtm30m`). Free, no auth, 100 locations per request, 1 req/s. No API key required.
+   - **Backend** (`camptocamp/detail.go`): after `parseTrack`, call `fetchElevationProfile(ctx, track)` — samples up to 100 points from the track, queries Google Elevation API, computes cumulative haversine distance for the X axis, returns `[][2]float64` (distance_km, elevation_m). Add `ElevationProfile [][2]float64 \`json:"elevation_profile,omitempty"\`` to `RouteDetail`. Falls back to `nil` if track is empty or API call fails.
+   - **Frontend** (`lib/types.ts`): add `elevation_profile?: [number, number][]` to `RouteDetail`.
+   - **Frontend** (`DetailPanel.tsx`): use `elevation_profile` when present; fall back to `makeSyntheticProfile` with a visible "Estimated profile" notice when absent.
 
 2. **Nominatim rate limiting**: production use should cache geocoding results or use a self-hosted instance to avoid Nominatim's 1 req/s limit.

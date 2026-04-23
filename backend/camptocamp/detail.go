@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"mountain-race/llm"
 )
@@ -55,7 +57,8 @@ type RouteDetail struct {
 	HeightDiffDown    int                `json:"height_diff_down"`
 	Lat               float64            `json:"lat"`
 	Lon               float64            `json:"lon"`
-	Track             [][2]float64       `json:"track,omitempty"` // WGS84 [lat, lon] pairs
+	Track             [][2]float64       `json:"track,omitempty"`             // WGS84 [lat, lon] pairs
+	ElevationProfile  [][2]float64       `json:"elevation_profile,omitempty"` // [distance_km, elevation_m] pairs
 	Pitches           []Pitch            `json:"pitches,omitempty"`
 	TopoURL           string             `json:"topo_url"`
 	GpxURL            string             `json:"gpx_url"`
@@ -106,8 +109,9 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 
 	pitches := parsePitches(data, lang)
 
-	gearText := extractGearText(data, lang)
-	llmItems, err := equipExtract(ctx, gearText, lang)
+	//gearText := extractGearText(data, lang)
+	//llmItems, err := equipExtract(ctx, gearText, lang)
+	llmItems := []llm.EquipmentItem{}
 	if err != nil {
 		return nil, fmt.Errorf("equipment parsing failed: %w", err)
 	}
@@ -120,6 +124,7 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 	alts := parseAlternatives(data, lang)
 	lat, lon := parseLatLon(data)
 	track := parseTrack(data)
+	elevProfile := fetchElevationProfile(ctx, track)
 
 	// Schedule: check if C2C has duration data in comments/description
 	sched := parseSchedule(data, float64(elevGain))
@@ -143,6 +148,7 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 		Lat:               lat,
 		Lon:               lon,
 		Track:             track,
+		ElevationProfile:  elevProfile,
 		Pitches:           pitches,
 		TopoURL:           topoURL,
 		GpxURL:            gpxURL,
@@ -311,6 +317,91 @@ func parseLatLon(m map[string]any) (lat, lon float64) {
 		return 0, 0
 	}
 	return webMercatorToWGS84(geojson.Coordinates[0], geojson.Coordinates[1])
+}
+
+// fetchElevationProfile queries OpenTopoData SRTM 30m for the elevation of each
+// track point and returns [distance_km, elevation_m] pairs. Returns nil on any
+// failure so the caller can fall back to a synthetic profile.
+func fetchElevationProfile(ctx context.Context, track [][2]float64) [][2]float64 {
+	if len(track) < 2 {
+		return nil
+	}
+
+	// Sample up to 100 points (API limit per request).
+	sampled := sampleTrack(track, 100)
+
+	// Build locations query string "lat,lon|lat,lon|..."
+	var sb strings.Builder
+	for i, p := range sampled {
+		if i > 0 {
+			sb.WriteByte('|')
+		}
+		sb.WriteString(fmt.Sprintf("%f,%f", p[0], p[1]))
+	}
+
+	url := "https://api.opentopodata.org/v1/srtm30m?locations=" + sb.String()
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	var body struct {
+		Results []struct {
+			Elevation *float64 `json:"elevation"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil
+	}
+	if len(body.Results) != len(sampled) {
+		return nil
+	}
+
+	// Build profile with cumulative haversine distance.
+	profile := make([][2]float64, len(sampled))
+	var cumDist float64
+	for i, res := range body.Results {
+		if res.Elevation == nil {
+			return nil
+		}
+		if i > 0 {
+			cumDist += haversineKm(sampled[i-1], sampled[i])
+		}
+		profile[i] = [2]float64{cumDist, *res.Elevation}
+	}
+	return profile
+}
+
+// sampleTrack returns at most n evenly-spaced points from track.
+func sampleTrack(track [][2]float64, n int) [][2]float64 {
+	if len(track) <= n {
+		return track
+	}
+	sampled := make([][2]float64, n)
+	for i := range sampled {
+		idx := int(math.Round(float64(i) * float64(len(track)-1) / float64(n-1)))
+		sampled[i] = track[idx]
+	}
+	return sampled
+}
+
+// haversineKm returns the great-circle distance in km between two WGS84 [lat,lon] points.
+func haversineKm(a, b [2]float64) float64 {
+	const R = 6371.0
+	lat1, lon1 := a[0]*math.Pi/180, a[1]*math.Pi/180
+	lat2, lon2 := b[0]*math.Pi/180, b[1]*math.Pi/180
+	dlat := lat2 - lat1
+	dlon := lon2 - lon1
+	s := math.Sin(dlat/2)*math.Sin(dlat/2) + math.Cos(lat1)*math.Cos(lat2)*math.Sin(dlon/2)*math.Sin(dlon/2)
+	return R * 2 * math.Atan2(math.Sqrt(s), math.Sqrt(1-s))
 }
 
 // parseTrack extracts the route line from the C2C geometry geom_detail field.

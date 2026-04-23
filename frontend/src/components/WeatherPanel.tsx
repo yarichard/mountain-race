@@ -131,7 +131,7 @@ export function WeatherPanel({ weather, loading, error }: Props) {
             )}
             <p className="text-xs mt-1 opacity-80">{avalanche.description}</p>
             {avalanche.massif_id && avalanche.massif_id > 0 && (
-              <div className="mt-2 space-y-2 overflow-y-auto max-h-96">
+              <div className="mt-2 space-y-2 overflow-y-auto max-h-48">
                 {(["montagne-risques", "apercu-meteo", "sept-derniers-jours"] as const).map((imgType) => (
                   <img
                     key={imgType}
