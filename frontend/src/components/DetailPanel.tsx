@@ -18,16 +18,11 @@ interface Props {
 
 type Tab = "map" | "elevation" | "topo";
 
-// Synthetic elevation profile from elevation gain (real GPX not decoded yet)
 function makeSyntheticProfile(elevGain: number) {
   const points = 20;
   return Array.from({ length: points }, (_, i) => {
     const t = i / (points - 1);
-    const bell = Math.sin(t * Math.PI);
-    return {
-      point: i + 1,
-      elevation: Math.round(1000 + bell * elevGain),
-    };
+    return { dist: +(t * 10).toFixed(1), elevation: Math.round(1000 + Math.sin(t * Math.PI) * elevGain) };
   });
 }
 
@@ -50,7 +45,10 @@ export function DetailPanel({ route, loading }: Props) {
     );
   }
 
-  const elevData = makeSyntheticProfile(route.elevation_gain);
+  const isSyntheticElev = !route.elevation_profile || route.elevation_profile.length < 2;
+  const elevData = isSyntheticElev
+    ? makeSyntheticProfile(route.elevation_gain)
+    : route.elevation_profile!.map(([dist, elev]) => ({ dist: +dist.toFixed(2), elevation: Math.round(elev) }));
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "topo", label: t("topo") },
@@ -135,12 +133,15 @@ export function DetailPanel({ route, loading }: Props) {
                     <stop offset="95%" stopColor="#1F2782" stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="point" tick={false} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(v) => [`${v} m`, "Altitude"]} />
+                <XAxis dataKey="dist" tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}km`} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}m`} />
+                <Tooltip formatter={(v) => [`${v} m`, "Altitude"]} labelFormatter={(l) => `${l} km`} />
                 <Area type="monotone" dataKey="elevation" stroke="#1F2782" fill="url(#elevGrad)" strokeWidth={2} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
+            {isSyntheticElev && (
+              <p className="text-xs text-[var(--text-muted)] mt-1 text-center italic">{t("elevationEstimated")}</p>
+            )}
           </div>
         )}
       </div>

@@ -74,6 +74,7 @@
     "loading": "Chargement de l'itinéraire depuis CampToCamp...",
     "map": "Carte",
     "elevation": "Profil altimétrique",
+    "elevationEstimated": "Profil estimé (pas de trace GPS disponible)",
     "topo": "Topo / Description",
     "pitchNumber": "Longueur",
     "grade": "Cotation",

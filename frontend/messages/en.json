@@ -74,6 +74,7 @@
     "loading": "Loading route from CampToCamp...",
     "map": "Map",
     "elevation": "Elevation profile",
+    "elevationEstimated": "Estimated profile (no GPS track available)",
     "topo": "Topo / Description",
     "pitchNumber": "Pitch",
     "grade": "Grade",
