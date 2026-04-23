@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+
 	"google.golang.org/genai"
 )
 
@@ -30,6 +31,13 @@ func ollamaModel() string {
 		return m
 	}
 	return "llama3.2"
+}
+
+func geminiModel() string {
+	if m := os.Getenv("GEMINI_MODEL"); m != "" {
+		return m
+	}
+	return "gemini-2.5-flash-lite"
 }
 
 var jsonArrayRe = regexp.MustCompile(`(?s)\[.*\]`)
@@ -104,25 +112,29 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 }
 
 func ExtractEquipmentGemini(ctx context.Context, gearText, lang string) ([]EquipmentItem, error) {
-    // The client gets the API key from the environment variable `GEMINI_API_KEY`.
-    client, err := genai.NewClient(ctx, nil)
-    if err != nil {
+	// The client gets the API key from the environment variable `GEMINI_API_KEY`.
+	client, err := genai.NewClient(ctx, nil)
+	if err != nil {
 		return nil, fmt.Errorf("creating Gemini client: %w", err)
-    }
+	}
 
-    result, err := client.Models.GenerateContent(
-        ctx,
-        "gemini-3-flash-preview",
-        genai.Text(equimentPrompt(gearText, lang)),
-        nil,
-    )
-    if err != nil {
-        return nil, fmt.Errorf("calling Gemini API: %w", err)
-    }
-    fmt.Println(result.Text())
+	result, err := client.Models.GenerateContent(
+		ctx,
+		geminiModel(),
+		genai.Text(equimentPrompt(gearText, lang)),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("calling Gemini API: %w", err)
+	}
+
+	resultStr := jsonArrayRe.FindString(result.Text())
+	if resultStr == "" {
+		return nil, fmt.Errorf("no JSON array found in Gemini response")
+	}
 
 	var items []EquipmentItem
-	if err := json.Unmarshal([]byte(result.Text()), &items); err != nil {
+	if err := json.Unmarshal([]byte(resultStr), &items); err != nil {
 		return nil, fmt.Errorf("parsing equipment JSON: %w", err)
 	}
 
