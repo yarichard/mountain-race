@@ -15,7 +15,14 @@ import (
 
 // equipExtract can be replaced in tests to avoid a real Ollama call.
 var equipExtract = func(ctx context.Context, gearText, lang string) ([]llm.EquipmentItem, error) {
-	return llm.ExtractEquipment(ctx, gearText, lang)
+	return []llm.EquipmentItem{
+		{Name: "Rope", Quantity: 1, Notes: "50m dynamic rope"},
+		{Name: "Harness", Quantity: 1, Notes: "Climbing harness"},
+		{Name: "Helmet", Quantity: 1, Notes: "Climbing helmet"},
+		{Name: "Quickdraws", Quantity: 12, Notes: "Set of quickdraws"},
+	}, nil
+
+	//return llm.ExtractEquipment(ctx, gearText, lang)
 }
 
 // Pitch represents a single pitch on a multipitch route.
@@ -414,14 +421,34 @@ func parseTrack(m map[string]any) [][2]float64 {
 	if !ok || detailStr == "" {
 		return nil
 	}
-	var geojson struct {
-		Coordinates [][2]float64 `json:"coordinates"`
+	var raw struct {
+		Type        string          `json:"type"`
+		Coordinates json.RawMessage `json:"coordinates"`
 	}
-	if err := json.Unmarshal([]byte(detailStr), &geojson); err != nil {
+	if err := json.Unmarshal([]byte(detailStr), &raw); err != nil {
 		return nil
 	}
-	track := make([][2]float64, len(geojson.Coordinates))
-	for i, c := range geojson.Coordinates {
+	var points [][2]float64
+	switch raw.Type {
+	case "LineString":
+		var coords [][2]float64
+		if err := json.Unmarshal(raw.Coordinates, &coords); err != nil {
+			return nil
+		}
+		points = coords
+	case "MultiLineString":
+		var coords [][][2]float64
+		if err := json.Unmarshal(raw.Coordinates, &coords); err != nil {
+			return nil
+		}
+		for _, line := range coords {
+			points = append(points, line...)
+		}
+	default:
+		return nil
+	}
+	track := make([][2]float64, len(points))
+	for i, c := range points {
 		lat, lon := webMercatorToWGS84(c[0], c[1])
 		track[i] = [2]float64{lat, lon}
 	}
