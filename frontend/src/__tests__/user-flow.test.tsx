@@ -61,7 +61,6 @@ const MOCK_ROUTE_DETAIL = {
   height_diff_down: 280,
   lat: 45.87,
   lon: 6.88,
-  pitches: [],
   topo_url: "",
   gpx_url: "",
   equipment: [{ item: "Crampons", quantity: 1, notes: "" }],

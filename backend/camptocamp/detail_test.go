@@ -25,19 +25,14 @@ func TestMain(m *testing.M) {
 // mockDetail is kept here for test use only.
 func mockDetail(id string) *RouteDetail {
 	return &RouteDetail{
-		ID:          id,
-		Title:       "Aiguille de l'Index — Voie normale (mock)",
-		Description: "Belle voie classique accessible depuis l'Aiguille du Midi.",
-		Difficulty:  "4c",
+		ID:             id,
+		Title:          "Aiguille de l'Index — Voie normale (mock)",
+		Description:    "Belle voie classique accessible depuis l'Aiguille du Midi.",
+		Difficulty:     "4c",
 		ElevationGain:  650,
 		HeightDiffDown: 400,
 		Lat:            45.9,
-		Lon:           6.9,
-		Pitches: []Pitch{
-			{Number: 1, Grade: "4a", Description: "Dalle initiale, prises évidentes."},
-			{Number: 2, Grade: "4c", Description: "Passage clé sur arête, expo."},
-			{Number: 3, Grade: "4b", Description: "Sortie en rocher brisé."},
-		},
+		Lon:            6.9,
 		Equipment: []Equipment{
 			{Item: "Corde 60m", Quantity: 1, Notes: "Simple"},
 			{Item: "Dégaines", Quantity: 12},
@@ -72,7 +67,7 @@ func c2cDetailServer(t *testing.T, doc map[string]any) *httptest.Server {
 // minimalRouteDoc builds a minimal C2C route document for tests.
 func minimalRouteDoc(overrides map[string]any) map[string]any {
 	doc := map[string]any{
-		"document_id":     float64(123456),
+		"document_id":      float64(123456),
 		"climbing_rating":  "5c",
 		"height_diff_up":   float64(650),
 		"height_diff_down": float64(400),
@@ -251,9 +246,6 @@ func TestGetDetail_MockIsComplete(t *testing.T) {
 	}
 	if d.AlternativeRoutes == nil {
 		t.Error("mock AlternativeRoutes must not be nil")
-	}
-	if len(d.Pitches) == 0 {
-		t.Error("mock Pitches must not be empty")
 	}
 	if d.Schedule.Source == "" {
 		t.Error("mock Schedule.Source must be set")

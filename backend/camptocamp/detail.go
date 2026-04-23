@@ -25,13 +25,6 @@ var equipExtract = func(ctx context.Context, gearText, lang string) ([]llm.Equip
 	//return llm.ExtractEquipment(ctx, gearText, lang)
 }
 
-// Pitch represents a single pitch on a multipitch route.
-type Pitch struct {
-	Number      int    `json:"number"`
-	Grade       string `json:"grade"`
-	Description string `json:"description"`
-}
-
 // Equipment item.
 type Equipment struct {
 	Item     string `json:"item"`
@@ -66,7 +59,6 @@ type RouteDetail struct {
 	Lon               float64            `json:"lon"`
 	Track             [][2]float64       `json:"track,omitempty"`             // WGS84 [lat, lon] pairs
 	ElevationProfile  [][2]float64       `json:"elevation_profile,omitempty"` // [distance_km, elevation_m] pairs
-	Pitches           []Pitch            `json:"pitches,omitempty"`
 	Images            []string           `json:"images,omitempty"`
 	GpxURL            string             `json:"gpx_url"`
 	GearText          string             `json:"gear_text"`
@@ -116,8 +108,6 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 	elevGain := intField(data, "height_diff_up")
 	elevDown := intField(data, "height_diff_down")
 
-	pitches := parsePitches(data, lang)
-
 	gearText := extractGearText(data, lang)
 
 	risks := parseRisks(data, lang)
@@ -149,7 +139,6 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 		Lon:               lon,
 		Track:             track,
 		ElevationProfile:  elevProfile,
-		Pitches:           pitches,
 		Images:            images,
 		GpxURL:            gpxURL,
 		GearText:          gearText,
@@ -168,15 +157,6 @@ func bestGrade(m map[string]any) string {
 		}
 	}
 	return ""
-}
-
-func parsePitches(m map[string]any, lang string) []Pitch {
-	locs := localesField(m)
-	pitchText := pickLocale(locs, lang, "pitch")
-	if pitchText == "" {
-		return nil
-	}
-	return []Pitch{{Number: 1, Grade: bestGrade(m), Description: pitchText}}
 }
 
 // extractGearText returns the raw gear description text from the C2C document.

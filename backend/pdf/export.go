@@ -50,15 +50,6 @@ const exportTemplate = `<!DOCTYPE html>
     <p>Avalanche: <span class="risk-{{.Weather.Avalanche.RiskLevel}}">{{.Weather.Avalanche.RiskLabel}}</span></p>
   </div>
 </div>
-{{if .Pitches}}
-<div class="card" style="margin-top:20px">
-  <h2>Longueurs</h2>
-  <table>
-    <tr><th>#</th><th>Grade</th><th>Description</th></tr>
-    {{range .Pitches}}<tr><td>{{.Number}}</td><td>{{.Grade}}</td><td>{{.Description}}</td></tr>{{end}}
-  </table>
-</div>
-{{end}}
 <div class="grid" style="margin-top:20px">
   <div class="card">
     <h2>Horaire</h2>
@@ -90,18 +81,11 @@ type PlanData struct {
 	Difficulty    string          `json:"difficulty"`
 	ElevationGain int             `json:"elevation_gain"`
 	DistanceKm    float64         `json:"distance_km"`
-	Pitches       []PitchData     `json:"pitches"`
 	Equipment     []EquipmentData `json:"equipment"`
 	Risks         []string        `json:"risks"`
 	Schedule      ScheduleData    `json:"schedule"`
 	Weather       WeatherData     `json:"weather"`
 	GeneratedAt   string          `json:"-"`
-}
-
-type PitchData struct {
-	Number      int    `json:"number"`
-	Grade       string `json:"grade"`
-	Description string `json:"description"`
 }
 
 type EquipmentData struct {

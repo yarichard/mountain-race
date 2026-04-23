@@ -89,30 +89,9 @@ export function DetailPanel({ route, loading }: Props) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {tab === "topo" && (
-          <div className="panel-body">
-            {route.pitches && route.pitches.length > 0 ? (
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="text-[var(--text-muted)] text-xs">
-                    <th className="text-left py-1 pr-2">#</th>
-                    <th className="text-left py-1 pr-2">{t("grade")}</th>
-                    <th className="text-left py-1">{t("description")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {route.pitches.map((p) => (
-                    <tr key={p.number} className="border-t border-[var(--border)]">
-                      <td className="py-1 pr-2 font-bold text-[var(--primary)]">{p.number}</td>
-                      <td className="py-1 pr-2">
-                        <span className="bg-[var(--primary)] text-white text-xs rounded px-1.5 py-0.5">{p.grade}</span>
-                      </td>
-                      <td className="py-1 text-sm">{p.description}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="text-sm leading-relaxed prose prose-sm max-w-none">
+          <div className="panel-body space-y-4">
+            {route.description && (
+              <div className="prose prose-sm max-w-none">
                 <ReactMarkdown>{route.description}</ReactMarkdown>
               </div>
             )}

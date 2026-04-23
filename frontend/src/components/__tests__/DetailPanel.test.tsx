@@ -29,10 +29,6 @@ const mockRoute: RouteDetail = {
   height_diff_down: 400,
   lat: 45.9,
   lon: 6.9,
-  pitches: [
-    { number: 1, grade: "5a", description: "Dalle initiale" },
-    { number: 2, grade: "5c", description: "Fissure principale" },
-  ],
   gear_text: "",
   gpx_url: "",
   equipment: [],
@@ -70,9 +66,8 @@ describe("DetailPanel", () => {
     expect(screen.getAllByText("5c").length).toBeGreaterThan(0);
   });
 
-  it("renders pitch table when route has pitches", () => {
+  it("renders route description", () => {
     render(<DetailPanel route={mockRoute} />);
-    expect(screen.getByText("5a")).toBeInTheDocument();
-    expect(screen.getByText("Dalle initiale")).toBeInTheDocument();
+    expect(screen.getByText("Belle voie sur granit.")).toBeInTheDocument();
   });
 });
