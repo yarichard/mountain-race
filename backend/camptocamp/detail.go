@@ -62,6 +62,7 @@ type RouteDetail struct {
 	Pitches           []Pitch            `json:"pitches,omitempty"`
 	TopoURL           string             `json:"topo_url"`
 	GpxURL            string             `json:"gpx_url"`
+	GearText          string             `json:"gear_text"`
 	Equipment         []Equipment        `json:"equipment"`
 	Risks             []string           `json:"risks"`
 	AlternativeRoutes []AlternativeRoute `json:"alternative_routes"`
@@ -109,16 +110,7 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 
 	pitches := parsePitches(data, lang)
 
-	//gearText := extractGearText(data, lang)
-	//llmItems, err := equipExtract(ctx, gearText, lang)
-	llmItems := []llm.EquipmentItem{}
-	if err != nil {
-		return nil, fmt.Errorf("equipment parsing failed: %w", err)
-	}
-	equipment := make([]Equipment, len(llmItems))
-	for i, item := range llmItems {
-		equipment[i] = Equipment{Item: item.Name, Quantity: item.Quantity, Notes: item.Notes}
-	}
+	gearText := extractGearText(data, lang)
 
 	risks := parseRisks(data, lang)
 	alts := parseAlternatives(data, lang)
@@ -152,7 +144,8 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 		Pitches:           pitches,
 		TopoURL:           topoURL,
 		GpxURL:            gpxURL,
-		Equipment:         equipment,
+		GearText:          gearText,
+		Equipment:         []Equipment{},
 		Risks:             risks,
 		AlternativeRoutes: alts,
 		Schedule:          sched,

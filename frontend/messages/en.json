@@ -102,6 +102,8 @@
   "equipment": {
     "title": "Equipment",
     "empty": "Select a route to see equipment",
+    "loading": "Analysing gear list...",
+    "extractionFailed": "Could not parse gear list — showing raw text:",
     "item": "Item",
     "quantity": "Quantity",
     "notes": "Notes"
