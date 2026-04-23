@@ -15,14 +15,15 @@ import (
 
 // equipExtract can be replaced in tests to avoid a real Ollama call.
 var equipExtract = func(ctx context.Context, gearText, lang string) ([]llm.EquipmentItem, error) {
-	return []llm.EquipmentItem{
-		{Name: "Rope", Quantity: 1, Notes: "50m dynamic rope"},
-		{Name: "Harness", Quantity: 1, Notes: "Climbing harness"},
-		{Name: "Helmet", Quantity: 1, Notes: "Climbing helmet"},
-		{Name: "Quickdraws", Quantity: 12, Notes: "Set of quickdraws"},
-	}, nil
+	// return []llm.EquipmentItem{
+	// 	{Name: "Rope", Quantity: 1, Notes: "50m dynamic rope"},
+	// 	{Name: "Harness", Quantity: 1, Notes: "Climbing harness"},
+	// 	{Name: "Helmet", Quantity: 1, Notes: "Climbing helmet"},
+	// 	{Name: "Quickdraws", Quantity: 12, Notes: "Set of quickdraws"},
+	// }, nil
 
-	//return llm.ExtractEquipment(ctx, gearText, lang)
+	//return llm.ExtractEquipmentOllama(ctx, gearText, lang)
+	return llm.ExtractEquipmentGemini(ctx, gearText, lang)
 }
 
 // Equipment item.

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"google.golang.org/genai"
 )
 
 // EquipmentItem is the structured output from LLM gear parsing.
@@ -33,28 +34,32 @@ func ollamaModel() string {
 
 var jsonArrayRe = regexp.MustCompile(`(?s)\[.*\]`)
 
-// ExtractEquipment parses a free-form gear description into a structured list.
-// lang is "fr" or "en" and drives the prompt language.
-// Returns an error if Ollama is unreachable or returns unparseable output.
-func ExtractEquipment(ctx context.Context, gearText, lang string) ([]EquipmentItem, error) {
-	if gearText == "" {
-		return nil, nil
-	}
-
+func equimentPrompt(gearText, lang string) string {
 	langName := "French"
 	if lang == "en" {
 		langName = "English"
 	}
-
-	prompt := fmt.Sprintf(`You are a mountain climbing equipment assistant.	Parse the following gear description and return a JSON array.
+	return fmt.Sprintf(`You are a mountain climbing equipment assistant.	Parse the following gear description and return a JSON array.
 	Each element must have exactly three fields:
-	"name": equipment name (string, in %s)
-	"quantity": number needed (integer, 1 if unspecified)
-	"notes": "optional" or "mandatory", plus any relevant detail (string, in %s)
-	The name of these equipments are related with the moutain climbing activity. They're also personal equipment that climbers should bring, for instance a relay is not one of them, quickdraws or rope are.
+	- "name": equipment name (string, in %s)
+	- "quantity": number needed (integer, 1 if unspecified)
+	- "notes": "optional" or "mandatory" (translated in %s), plus any relevant detail (string, in %s)
+	The name of these equipments are related with the mountain activities. You should only point out personal equipment, for instance quickdraws or rope.
 	You should include only equipment you're absolutely sure about.
 	Output ONLY the JSON array, no explanation. 
-	Gear description:%s`, langName, langName, gearText)
+	Gear description:
+	%s`, langName, langName, langName, gearText)
+}
+
+// ExtractEquipment parses a free-form gear description into a structured list.
+// lang is "fr" or "en" and drives the prompt language.
+// Returns an error if Ollama is unreachable or returns unparseable output.
+func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]EquipmentItem, error) {
+	if gearText == "" {
+		return nil, nil
+	}
+
+	prompt := equimentPrompt(gearText, lang)
 
 	body, _ := json.Marshal(map[string]any{
 		"model":  ollamaModel(),
@@ -92,6 +97,32 @@ func ExtractEquipment(ctx context.Context, gearText, lang string) ([]EquipmentIt
 
 	var items []EquipmentItem
 	if err := json.Unmarshal([]byte(match), &items); err != nil {
+		return nil, fmt.Errorf("parsing equipment JSON: %w", err)
+	}
+
+	return items, nil
+}
+
+func ExtractEquipmentGemini(ctx context.Context, gearText, lang string) ([]EquipmentItem, error) {
+    // The client gets the API key from the environment variable `GEMINI_API_KEY`.
+    client, err := genai.NewClient(ctx, nil)
+    if err != nil {
+		return nil, fmt.Errorf("creating Gemini client: %w", err)
+    }
+
+    result, err := client.Models.GenerateContent(
+        ctx,
+        "gemini-3-flash-preview",
+        genai.Text(equimentPrompt(gearText, lang)),
+        nil,
+    )
+    if err != nil {
+        return nil, fmt.Errorf("calling Gemini API: %w", err)
+    }
+    fmt.Println(result.Text())
+
+	var items []EquipmentItem
+	if err := json.Unmarshal([]byte(result.Text()), &items); err != nil {
 		return nil, fmt.Errorf("parsing equipment JSON: %w", err)
 	}
 
