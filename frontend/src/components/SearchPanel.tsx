@@ -259,7 +259,7 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
             {results.length === 0 ? (
               <p className="text-sm text-[var(--text-muted)]">{t("noResults")}</p>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
                 {results.map((r) => (
                   <div
                     key={r.id}
