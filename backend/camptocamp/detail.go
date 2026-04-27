@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -13,16 +14,12 @@ import (
 	"mountain-race/llm"
 )
 
-// equipExtract can be replaced in tests to avoid a real Ollama call.
+// equipExtract can be replaced in tests to avoid a real LLM call.
+// The provider is selected at runtime via the LLM_PROVIDER env var ("gemini" or "ollama", default "gemini").
 var equipExtract = func(ctx context.Context, gearText, lang string) ([]llm.EquipmentItem, error) {
-	// return []llm.EquipmentItem{
-	// 	{Name: "Rope", Quantity: 1, Notes: "50m dynamic rope"},
-	// 	{Name: "Harness", Quantity: 1, Notes: "Climbing harness"},
-	// 	{Name: "Helmet", Quantity: 1, Notes: "Climbing helmet"},
-	// 	{Name: "Quickdraws", Quantity: 12, Notes: "Set of quickdraws"},
-	// }, nil
-
-	//return llm.ExtractEquipmentOllama(ctx, gearText, lang)
+	if os.Getenv("LLM_PROVIDER") == "ollama" {
+		return llm.ExtractEquipmentOllama(ctx, gearText, lang)
+	}
 	return llm.ExtractEquipmentGemini(ctx, gearText, lang)
 }
 
