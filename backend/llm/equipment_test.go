@@ -9,13 +9,16 @@ import (
 	"testing"
 )
 
-func mockOllamaServer(t *testing.T, response string) *httptest.Server {
+func mockOllamaServer(t *testing.T, content string) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"response": response,
-			"done":     true,
+			"message": map[string]any{
+				"role":    "assistant",
+				"content": content,
+			},
+			"done": true,
 		})
 	}))
 	t.Setenv("OLLAMA_URL", srv.URL)
@@ -81,8 +84,11 @@ func TestExtractEquipment_EnglishLang(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(&capturedBody)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"response": `[{"name":"Rope 60m","quantity":1,"notes":"mandatory"}]`,
-			"done":     true,
+			"message": map[string]any{
+				"role":    "assistant",
+				"content": `[{"name":"Rope 60m","quantity":1,"notes":"mandatory"}]`,
+			},
+			"done": true,
 		})
 	}))
 	defer srv.Close()
@@ -95,8 +101,8 @@ func TestExtractEquipment_EnglishLang(t *testing.T) {
 	if len(items) == 0 {
 		t.Fatal("expected items, got none")
 	}
-	prompt, _ := capturedBody["prompt"].(string)
-	if len(prompt) == 0 {
-		t.Error("prompt was not sent to ollama")
+	messages, _ := capturedBody["messages"].([]any)
+	if len(messages) == 0 {
+		t.Error("messages were not sent to ollama")
 	}
 }

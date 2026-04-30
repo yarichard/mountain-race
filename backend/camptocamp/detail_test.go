@@ -5,22 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
-
-	"mountain-race/llm"
 )
-
-func TestMain(m *testing.M) {
-	// Stub LLM extraction so detail tests don't need a real Ollama instance.
-	equipExtract = func(_ context.Context, gearText, _ string) ([]llm.EquipmentItem, error) {
-		if gearText == "" {
-			return nil, nil
-		}
-		return []llm.EquipmentItem{{Name: "Stub item", Quantity: 1, Notes: "mandatory"}}, nil
-	}
-	os.Exit(m.Run())
-}
 
 // mockDetail is kept here for test use only.
 func mockDetail(id string) *RouteDetail {

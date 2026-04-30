@@ -75,7 +75,7 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 	description += pickLocale(locs, lang, "external_resources") + "\n"
 
 	// CamptoCamp specific: some descriptions have "##" without space
-	description = strings.Replace(description, "##", "## ", -1)
+	description = strings.ReplaceAll(description, "##", "## ")
 	// replace all "L#" occurences and replace # with L and an index beginning at 1 and increasing for each occurence.
 	pitchIndex := 1
 	description = regexp.MustCompile(`L#`).ReplaceAllStringFunc(description, func(s string) string {
@@ -96,7 +96,6 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 	elevDown := intField(data, "height_diff_down")
 
 	gearText := extractGearText(data, lang)
-
 	risks := parseRisks(data, lang)
 	alts := parseAlternatives(data, lang)
 	lat, lon := parseLatLon(data)
@@ -129,7 +128,6 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 		Images:            images,
 		GpxURL:            gpxURL,
 		GearText:          gearText,
-		Equipment:         []Equipment{},
 		Risks:             risks,
 		AlternativeRoutes: alts,
 		Schedule:          sched,
@@ -309,7 +307,7 @@ func fetchElevationProfile(ctx context.Context, track [][2]float64) [][2]float64
 		if i > 0 {
 			sb.WriteByte('|')
 		}
-		sb.WriteString(fmt.Sprintf("%f,%f", p[0], p[1]))
+		fmt.Fprintf(&sb, "%f,%f", p[0], p[1])
 	}
 
 	url := "https://api.opentopodata.org/v1/srtm30m?locations=" + sb.String()
