@@ -106,7 +106,9 @@
     "extractionFailed": "Impossible d'analyser le matériel — texte brut :",
     "item": "Item",
     "quantity": "Quantité",
-    "notes": "Notes"
+    "notes": "Notes",
+    "showOriginal": "Afficher le champ original",
+    "originalLabel": "Texte d'équipement original"
   },
   "export": {
     "button": "Exporter en PDF",

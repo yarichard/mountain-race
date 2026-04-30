@@ -318,4 +318,4 @@ To use it: open the project in VS Code and select **Reopen in Container** when p
   - Convert the model to Ollama gguf format `python ../llama.cpp/convert_hf_to_gguf.py ./gear_merged --outfile ./data/gear.gguf --outtype q8_0` (using llama.cpp `git clone https://github.com/ggerganov/llama.cpp.git`)
   - Import the model into Ollama: `ollama create gear-assistant -f Modelfile`
 
-  ![Training](./data/Bandb_training.png)
+  ![Training](./data/wandb_training.png)

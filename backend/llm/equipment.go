@@ -43,25 +43,17 @@ func geminiModel() string {
 
 var jsonArrayRe = regexp.MustCompile(`(?s)\[.*\]`)
 
-func equimentSystemPrompt(lang string) string {
-	langName := "French"
-	if lang == "en" {
-		langName = "English"
-	}
-	return fmt.Sprintf(`You are a mountain climbing equipment assistant. Parse the following gear description and return a JSON array.
-	Each element must have exactly three fields:
-	- "name": equipment name (string, in %s)
+func equipmentSystemPrompt() string {
+	return `You are a mountain climbing equipment assistant. Parse the following gear description and return a JSON array. Each element must have exactly three fields:
+	- "name": equipment name (string, in french)
 	- "quantity": number needed (integer, 1 if unspecified)
-	- "notes": "optional" or "mandatory" (translated in %s), plus any relevant detail (string, in %s)
+	- "notes": "optional" or "mandatory" (translated in french), plus any relevant detail (string, in french)
 	The name of these equipments are related with the mountain activities. You should only point out personal equipment, for instance quickdraws or rope.
-	You should include only equipment you're absolutely sure about.
-	Output ONLY the JSON array, no explanation. 
-	Gear description:
-	%s`, langName, langName, langName)
+	You should include only equipment you're absolutely sure about. Output ONLY the JSON array, no explanation.`
 }
 
 func equipmentUserPrompt(gearText string) string {
-	return "Gear description: \n" + gearText
+	return "Gear description:\n " + gearText
 }
 
 type Message struct {
@@ -91,7 +83,7 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 	reqBody := OllamaRequest{
         Model: ollamaModel(),
         Messages: []Message{
-            {Role: "system", Content: equimentSystemPrompt(lang)},
+            {Role: "system", Content: equipmentSystemPrompt()},
             {Role: "user", Content: equipmentUserPrompt(gearText)},
         },
         Stream: false,
@@ -141,7 +133,7 @@ func ExtractEquipmentGemini(ctx context.Context, gearText, lang string) ([]Equip
 	result, err := client.Models.GenerateContent(
 		ctx,
 		geminiModel(),
-		genai.Text(equimentSystemPrompt(lang) + equipmentUserPrompt(gearText)),
+		genai.Text(equipmentSystemPrompt()+"\n\n"+equipmentUserPrompt(gearText)),
 		nil,
 	)
 	if err != nil {
