@@ -49,13 +49,11 @@ type RouteDetail struct {
 	Images            []string           `json:"images,omitempty"`
 	GpxURL            string             `json:"gpx_url"`
 	GearText          string             `json:"gear_text"`
-	Equipment         []Equipment        `json:"equipment"`
 	Risks             []string           `json:"risks"`
 	AlternativeRoutes []AlternativeRoute `json:"alternative_routes"`
 	Schedule          Schedule           `json:"schedule"`
 	SourceURL         string             `json:"source_url"`
 }
-
 
 // GetDetail fetches full route detail from CampToCamp.
 func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
