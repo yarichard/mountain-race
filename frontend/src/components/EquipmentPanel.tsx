@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { Equipment, RouteDetail } from "@/lib/types";
 import { LoadingSpinner } from "./LoadingSpinner";
@@ -12,6 +13,7 @@ interface Props {
 
 export function EquipmentPanel({ route, equipment, gearText }: Props) {
   const t = useTranslations("equipment");
+  const [showOriginal, setShowOriginal] = useState(true);
 
   if (!route) {
     return (
@@ -49,8 +51,21 @@ export function EquipmentPanel({ route, equipment, gearText }: Props) {
 
   return (
     <div className="panel flex flex-col h-full">
-      <div className="panel-header">{t("title")}</div>
+      <div className="panel-header flex items-center justify-between">
+        <span>{t("title")}</span>
+      </div>
       <div className="panel-body flex-1 overflow-y-auto">
+        {gearText && (
+          <label className="flex items-center gap-1 text-xs font-normal cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showOriginal}
+              onChange={(e) => setShowOriginal(e.target.checked)}
+              className="cursor-pointer"
+            />
+            {t("showOriginal")}
+          </label>
+        )}
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-[var(--text-muted)] text-xs border-b border-[var(--border)]">
@@ -69,6 +84,12 @@ export function EquipmentPanel({ route, equipment, gearText }: Props) {
             ))}
           </tbody>
         </table>
+        {showOriginal && gearText && (
+          <div className="mt-3 pt-3 border-t border-[var(--border)]">
+            <p className="text-xs text-[var(--text-muted)] font-medium mb-1">{t("originalLabel")}</p>
+            <p className="text-xs whitespace-pre-wrap text-[var(--text-muted)]">{gearText}</p>
+          </div>
+        )}
       </div>
     </div>
   );

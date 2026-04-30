@@ -106,7 +106,9 @@
     "extractionFailed": "Could not parse gear list — showing raw text:",
     "item": "Item",
     "quantity": "Quantity",
-    "notes": "Notes"
+    "notes": "Notes",
+    "showOriginal": "Display original field",
+    "originalLabel": "Original gear text"
   },
   "export": {
     "button": "Export to PDF",

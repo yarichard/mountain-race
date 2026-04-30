@@ -9,5 +9,16 @@ SYSTEM """You are a mountain climbing equipment assistant. Parse the following g
 The name of these equipments are related with the mountain activities. You should only point out personal equipment, for instance quickdraws or rope.
 You should include only equipment you're absolutely sure about. Output ONLY the JSON array, no explanation."""
 
+TEMPLATE """{{ if .System }}<|start_header_id|>system<|end_header_id|>
+
+{{ .System }}<|eot_id|>{{ end }}{{ range .Messages }}<|start_header_id|>{{ .Role }}<|end_header_id|>
+
+{{ .Content }}<|eot_id|>{{ end }}<|start_header_id|>assistant<|end_header_id|>
+
+"""
+
+PARAMETER stop "<|start_header_id|>"
+PARAMETER stop "<|end_header_id|>"
+PARAMETER stop "<|eot_id|>"
 PARAMETER temperature 0
 PARAMETER num_predict 512
