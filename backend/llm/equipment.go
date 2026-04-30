@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -42,12 +43,12 @@ func geminiModel() string {
 
 var jsonArrayRe = regexp.MustCompile(`(?s)\[.*\]`)
 
-func equimentPrompt(gearText, lang string) string {
+func equimentSystemPrompt(lang string) string {
 	langName := "French"
 	if lang == "en" {
 		langName = "English"
 	}
-	return fmt.Sprintf(`You are a mountain climbing equipment assistant.	Parse the following gear description and return a JSON array.
+	return fmt.Sprintf(`You are a mountain climbing equipment assistant. Parse the following gear description and return a JSON array.
 	Each element must have exactly three fields:
 	- "name": equipment name (string, in %s)
 	- "quantity": number needed (integer, 1 if unspecified)
@@ -56,7 +57,27 @@ func equimentPrompt(gearText, lang string) string {
 	You should include only equipment you're absolutely sure about.
 	Output ONLY the JSON array, no explanation. 
 	Gear description:
-	%s`, langName, langName, langName, gearText)
+	%s`, langName, langName, langName)
+}
+
+func equipmentUserPrompt(gearText string) string {
+	return "Gear description: \n" + gearText
+}
+
+type Message struct {
+    Role    string `json:"role"`
+    Content string `json:"content"`
+}
+
+type OllamaRequest struct {
+    Model    string    `json:"model"`
+    Messages []Message `json:"messages"`
+    Stream   bool      `json:"stream"`
+    Options  map[string]any `json:"options"`
+}
+
+type OllamaResponse struct {
+    Message Message `json:"message"`
 }
 
 // ExtractEquipment parses a free-form gear description into a structured list.
@@ -67,15 +88,20 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 		return nil, nil
 	}
 
-	prompt := equimentPrompt(gearText, lang)
-
-	body, _ := json.Marshal(map[string]any{
-		"model":  ollamaModel(),
-		"prompt": prompt,
-		"stream": false,
-	})
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ollamaURL()+"/api/generate", bytes.NewReader(body))
+	reqBody := OllamaRequest{
+        Model: ollamaModel(),
+        Messages: []Message{
+            {Role: "system", Content: equimentSystemPrompt(lang)},
+            {Role: "user", Content: equipmentUserPrompt(gearText)},
+        },
+        Stream: false,
+        Options: map[string]any{
+            "num_predict": 512,
+            "temperature": 0,   // greedy, deterministic JSON
+        },
+    }
+	body, _ := json.Marshal(reqBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ollamaURL()+"/api/chat", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("building ollama request: %w", err)
 	}
@@ -91,20 +117,14 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 		return nil, fmt.Errorf("ollama returned status %d", resp.StatusCode)
 	}
 
-	var ollamaResp struct {
-		Response string `json:"response"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return nil, fmt.Errorf("decoding ollama response: %w", err)
-	}
-
-	match := jsonArrayRe.FindString(ollamaResp.Response)
-	if match == "" {
-		return nil, fmt.Errorf("no JSON array found in LLM response")
-	}
-
+	raw, _ := io.ReadAll(resp.Body)
+    var ollamaResp OllamaResponse
+    if err := json.Unmarshal(raw, &ollamaResp); err != nil {
+        return nil, err
+    }
+	
 	var items []EquipmentItem
-	if err := json.Unmarshal([]byte(match), &items); err != nil {
+	if err := json.Unmarshal([]byte(ollamaResp.Message.Content), &items); err != nil {
 		return nil, fmt.Errorf("parsing equipment JSON: %w", err)
 	}
 
@@ -121,7 +141,7 @@ func ExtractEquipmentGemini(ctx context.Context, gearText, lang string) ([]Equip
 	result, err := client.Models.GenerateContent(
 		ctx,
 		geminiModel(),
-		genai.Text(equimentPrompt(gearText, lang)),
+		genai.Text(equimentSystemPrompt(lang) + equipmentUserPrompt(gearText)),
 		nil,
 	)
 	if err != nil {
