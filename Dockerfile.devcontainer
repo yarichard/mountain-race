@@ -9,10 +9,18 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
         nodejs \
         libeccodes-dev \
         chromium \
+        python3 \
+        python3-venv \
+        python3-pip \
     && npm install -g npm@latest \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install ipykernel --break-system-packages
 
 USER vscode
+
+# Install uv for vscode user
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/vscode/.local/bin:$PATH"
 
 # Install Claude Code
 RUN curl -fsSL https://claude.ai/install.sh | bash

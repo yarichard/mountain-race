@@ -188,7 +188,7 @@ Parts:
 - **Part 6: Risks, points of vigilance.** Filled when a race is selected. Data from CampToCamp user comments and the route's global description.
 - **Part 7: Alternative routes.** Filled when a race is selected. Other routes in case of difficulty: easier fallback, return point, etc.
 - **Part 8: Schedule.** Filled when a race is selected. Estimated duration and recommended start/end times. Sourced from CampToCamp user comments when available; otherwise computed via Naismith's rule — a clear notice is shown to the user in this case.
-- **Part 9: Equipment.** Filled when a race is selected. Equipment list sourced from CampToCamp (e.g. number of quickdraws, rope length, crampons).
+- **Part 9: Equipment.** Filled when a race is selected. Equipment list sourced from CampToCamp (e.g. number of quickdraws, rope length, crampons). This list comes from a text field named "gear" returned by CampToCamp API that is converted into json with the help of a LLM (see detail in **Analyzing equipment section**)
 
 Layout:
 
@@ -209,6 +209,20 @@ Layout:
 - **Weather forecast implementation**: `backend/meteo/forecast.go` calls Open-Meteo with a single GET request. For race dates within 4 days: `models=meteofrance_seamless`, `temperature_100m`. Beyond 4 days: no `models` param, `temperature_120m`. Always requests `wind_speed_10m` and `precipitation`. Returns a daily summary (min/max temp, total precipitation, max wind) plus 24 hourly points.
 - **Avalanche forecast implementation**: `backend/meteo/avalanche.go` calls MeteoFrance DPBRA using a Bearer token from `backend/meteo/token.go`. Steps: (1) `GET /liste-massifs` to get GeoJSON massif polygons; (2) point-in-polygon test to find the containing massif; (3) `GET /massif/BRA?id-massif=X&format=xml` to fetch the BRA XML and extract `RISQUEMAXI` for the target date. Returns `massif_id` and `massif_name` in the response. Falls back to a mock result (`risk_level=2`, no `massif_id`) when credentials are absent or the API is unreachable.
 - **Avalanche image proxy**: `backend/meteo/avalanche.go#ProxyMassifImage` fetches `GET /massif/image/{type}?id-massif=X` from DPBRA with Bearer auth and streams the response. Exposed as `GET /api/avalanche/image` in `backend/api/weather.go`. Allowed image types: `montagne-risques`, `apercu-meteo`, `sept-derniers-jours`. The frontend renders these images directly using `<img src="/api/avalanche/image?...">` when `massif_id > 0`.
+
+### Analyzing equipment section
+
+CampToCamp returns a `gear` field that is free-form text. The backend (`backend/llm/`) sends this text to an LLM with a structured prompt (`SYSTEM_PROMPT` in `data/equipment.py`) and expects back a JSON array where each item has three fields: `name` (string, french), `quantity` (integer), and `notes` (`"optionnel"` or `"obligatoire"` plus any relevant detail, in french).
+
+The `data/` folder contains everything needed to fine-tune and evaluate a dedicated model for this parsing task:
+
+- **`equipment.py`** — `Equipment` Pydantic model representing one route's gear list. Holds the `SYSTEM_PROMPT`, builds the chat-template prompt/completion pair via a Llama tokenizer, and exposes `push_to_hub` / `from_hub` helpers for the HuggingFace dataset.
+- **`gear_loader.py`** — `GearLoader` class that reads `gear_dataset.jsonl` in parallel chunks and produces a list of `Equipment` instances ready for training.
+- **`gear_dataset.jsonl`** — working dataset (may differ from original after cleaning).
+- **`gear_dataset_original.jsonl`** — original unmodified dataset kept as a reference.
+- **`gear_preparing.ipynb`** — data preparation notebook: loads the raw dataset, filters, builds prompts, splits into train/val/test, pushes to HuggingFace Hub.
+- **`gear_training.ipynb`** — fine-tuning notebook (runs on GPU infrastructure, not locally).
+- **`gear_testing.ipynb`** — model evaluation notebook: loads the fine-tuned model, runs inference on the test split. Uses evaluation helper for JSON completions (`JsonTester` / `evaluate`). Measures F1/precision/recall on matched equipment item names (fuzzy matching), JSON validity rate, and plots an error-trend chart (1 − F1) and an F1-score histogram. Usage: `evaluate(model_predict, test_data)`.
 
 ---
 
