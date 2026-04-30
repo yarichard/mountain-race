@@ -19,11 +19,6 @@ func mockDetail(id string) *RouteDetail {
 		HeightDiffDown: 400,
 		Lat:            45.9,
 		Lon:            6.9,
-		Equipment: []Equipment{
-			{Item: "Corde 60m", Quantity: 1, Notes: "Simple"},
-			{Item: "Dégaines", Quantity: 12},
-			{Item: "Casque", Quantity: 1, Notes: "Obligatoire"},
-		},
 		Risks: []string{
 			"Risque de chute de pierres en début de journée",
 			"Météo alpine changeante, vérifier bulletin avant départ",

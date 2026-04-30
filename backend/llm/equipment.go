@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"time"
 
 	"google.golang.org/genai"
 )
@@ -80,6 +81,11 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 		return nil, nil
 	}
 
+	// Ollama inference can take minutes — detach from the HTTP request context
+	// (which gets cancelled when the client disconnects) and use a hard deadline instead.
+	ollamaCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
 	reqBody := ollamaChatRequest{
 		Model: ollamaModel(),
 		Messages: []ollamaChatMessage{
@@ -93,7 +99,7 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 		},
 	}
 	body, _ := json.Marshal(reqBody)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ollamaURL()+"/api/chat", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ollamaCtx, http.MethodPost, ollamaURL()+"/api/chat", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("building ollama request: %w", err)
 	}
