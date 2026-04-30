@@ -12,7 +12,9 @@
                 "mhutchie.git-graph",
                 "postman.postman-for-vscode",
                 "alexcvzz.vscode-sqlite",
-                "anthropic.claude-code"
+                "anthropic.claude-code",
+                "ms-python.python",
+                "ms-toolsai.jupyter"
             ]
         }
     },

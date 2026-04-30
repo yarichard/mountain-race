@@ -10,3 +10,9 @@ backend/bin/
 backend/static/
 test/test-results
 server
+.venv/
+__pycache__/
+uv.lock
+gear_merged/
+generate_gear_dataset
+gear.gguf

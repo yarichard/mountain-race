@@ -2,6 +2,7 @@
 
 A single-page application to help plan mountain races with a group of friends. Enter your team, pick a route type and difficulty, search CampToCamp for matching routes, and get a full race plan — including weather, avalanche risk, schedule, equipment list, and a PDF export.
 
+![Screen](./Screenshot.png)
 ---
 
 ## Features
@@ -306,3 +307,15 @@ To use it: open the project in VS Code and select **Reopen in Container** when p
 | **Nominatim rate limit** | The geocoding endpoint is subject to Nominatim's public 1 req/s limit. Production use should add caching or a self-hosted instance. |
 | **Frontend unit tests** | React Testing Library tests are planned but not yet written. |
 | **E2E tests** | Playwright test suite (`test/`) is planned but not yet implemented. |
+
+## Training gear equipment model
+- Generate jsonl file using **generate_gear_dataset go helper
+- Clean & prepare data using gear_preparing.ipynb locally
+- Train model using gear_training.ipynb on Google collab
+- Test the model using gear_testing.ipynb on Google collab
+- (Optional) For ollama local use:
+  - Download the trained & merged model `hf download yrichard/gear_training-2026-04-28_13.15.01-merged --local-dir ./data/gear_merged`. Be careful, model needs not to be loaded with quantization in order to make it work
+  - Convert the model to Ollama gguf format `python ../llama.cpp/convert_hf_to_gguf.py ./gear_merged --outfile ./data/gear.gguf --outtype q8_0` (using llama.cpp `git clone https://github.com/ggerganov/llama.cpp.git`)
+  - Import the model into Ollama: `ollama create gear-assistant -f Modelfile`
+
+  ![Training](./data/Bandb_training.png)
