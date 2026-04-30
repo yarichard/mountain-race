@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -8,10 +9,20 @@ import (
 
 	"mountain-race/camptocamp"
 	"mountain-race/llm"
+	"os"
 )
 
 type extractEquipmentRequest struct {
 	GearText string `json:"gear_text"`
+}
+
+// equipExtract can be replaced in tests to avoid a real LLM call.
+// The provider is selected at runtime via the LLM_PROVIDER env var ("gemini" or "ollama", default "gemini").
+var equipExtract = func(ctx context.Context, gearText, lang string) ([]llm.EquipmentItem, error) {
+	if os.Getenv("LLM_PROVIDER") == "ollama" {
+		return llm.ExtractEquipmentOllama(ctx, gearText, lang)
+	}
+	return llm.ExtractEquipmentGemini(ctx, gearText, lang)
 }
 
 // ExtractEquipment handles POST /api/equipment/extract
@@ -28,8 +39,8 @@ func ExtractEquipment(c *gin.Context) {
 	}
 
 	lang := preferredLang(c.GetHeader("Accept-Language"))
-	items, err := llm.ExtractEquipmentGemini(c.Request.Context(), req.GearText, lang)
-	if err != nil {
+	items, err := equipExtract(c.Request.Context(), req.GearText, lang)
+	if err != nil || len(items) == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
