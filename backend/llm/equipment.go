@@ -56,23 +56,23 @@ func equipmentUserPrompt(gearText string) string {
 	return "Gear description:\n " + gearText
 }
 
-type Message struct {
-    Role    string `json:"role"`
-    Content string `json:"content"`
+type ollamaChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
-type OllamaRequest struct {
-    Model    string    `json:"model"`
-    Messages []Message `json:"messages"`
-    Stream   bool      `json:"stream"`
-    Options  map[string]any `json:"options"`
+type ollamaChatRequest struct {
+	Model    string              `json:"model"`
+	Messages []ollamaChatMessage `json:"messages"`
+	Stream   bool                `json:"stream"`
+	Options  map[string]any      `json:"options"`
 }
 
-type OllamaResponse struct {
-    Message Message `json:"message"`
+type ollamaChatResponse struct {
+	Message ollamaChatMessage `json:"message"`
 }
 
-// ExtractEquipment parses a free-form gear description into a structured list.
+// ExtractEquipmentOllama parses a free-form gear description into a structured list.
 // lang is "fr" or "en" and drives the prompt language.
 // Returns an error if Ollama is unreachable or returns unparseable output.
 func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]EquipmentItem, error) {
@@ -80,18 +80,18 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 		return nil, nil
 	}
 
-	reqBody := OllamaRequest{
-        Model: ollamaModel(),
-        Messages: []Message{
-            {Role: "system", Content: equipmentSystemPrompt()},
-            {Role: "user", Content: equipmentUserPrompt(gearText)},
-        },
-        Stream: false,
-        Options: map[string]any{
-            "num_predict": 512,
-            "temperature": 0,   // greedy, deterministic JSON
-        },
-    }
+	reqBody := ollamaChatRequest{
+		Model: ollamaModel(),
+		Messages: []ollamaChatMessage{
+			{Role: "system", Content: equipmentSystemPrompt()},
+			{Role: "user", Content: equipmentUserPrompt(gearText)},
+		},
+		Stream: false,
+		Options: map[string]any{
+			"num_predict": 512,
+			"temperature": 0,
+		},
+	}
 	body, _ := json.Marshal(reqBody)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ollamaURL()+"/api/chat", bytes.NewReader(body))
 	if err != nil {
@@ -110,13 +110,18 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 	}
 
 	raw, _ := io.ReadAll(resp.Body)
-    var ollamaResp OllamaResponse
-    if err := json.Unmarshal(raw, &ollamaResp); err != nil {
-        return nil, err
-    }
-	
+	var ollamaResp ollamaChatResponse
+	if err := json.Unmarshal(raw, &ollamaResp); err != nil {
+		return nil, fmt.Errorf("parsing ollama response: %w", err)
+	}
+
+	match := jsonArrayRe.FindString(ollamaResp.Message.Content)
+	if match == "" {
+		return nil, fmt.Errorf("no JSON array found in ollama response")
+	}
+
 	var items []EquipmentItem
-	if err := json.Unmarshal([]byte(ollamaResp.Message.Content), &items); err != nil {
+	if err := json.Unmarshal([]byte(match), &items); err != nil {
 		return nil, fmt.Errorf("parsing equipment JSON: %w", err)
 	}
 
