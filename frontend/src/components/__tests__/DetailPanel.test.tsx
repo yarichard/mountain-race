@@ -33,7 +33,7 @@ const mockRoute: RouteDetail = {
     { number: 1, grade: "5a", description: "Dalle initiale" },
     { number: 2, grade: "5c", description: "Fissure principale" },
   ],
-  topo_url: "",
+  gear_text: "",
   gpx_url: "",
   equipment: [],
   risks: [],

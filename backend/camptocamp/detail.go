@@ -60,7 +60,7 @@ type RouteDetail struct {
 	Track             [][2]float64       `json:"track,omitempty"`             // WGS84 [lat, lon] pairs
 	ElevationProfile  [][2]float64       `json:"elevation_profile,omitempty"` // [distance_km, elevation_m] pairs
 	Pitches           []Pitch            `json:"pitches,omitempty"`
-	TopoURL           string             `json:"topo_url"`
+	Images            []string           `json:"images,omitempty"`
 	GpxURL            string             `json:"gpx_url"`
 	GearText          string             `json:"gear_text"`
 	Equipment         []Equipment        `json:"equipment"`
@@ -69,6 +69,7 @@ type RouteDetail struct {
 	Schedule          Schedule           `json:"schedule"`
 	SourceURL         string             `json:"source_url"`
 }
+
 
 // GetDetail fetches full route detail from CampToCamp.
 func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
@@ -121,8 +122,8 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 	// Schedule: check if C2C has duration data in comments/description
 	sched := parseSchedule(data, float64(elevGain))
 
-	// Topo and GPX
-	topoURL := firstImageURL(data)
+	// Images and GPX
+	images := allImageFilenames(data)
 	gpxURL := ""
 	if as, ok := data["associations"].(map[string]any); ok {
 		if docs, ok := as["waypoints"].([]any); ok && len(docs) > 0 {
@@ -142,7 +143,7 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 		Track:             track,
 		ElevationProfile:  elevProfile,
 		Pitches:           pitches,
-		TopoURL:           topoURL,
+		Images:            images,
 		GpxURL:            gpxURL,
 		GearText:          gearText,
 		Equipment:         []Equipment{},
@@ -268,21 +269,26 @@ func parseSchedule(m map[string]any, elevGainM float64) Schedule {
 	}
 }
 
-func firstImageURL(m map[string]any) string {
-	imgs, ok := m["images"].([]any)
+func allImageFilenames(m map[string]any) []string {
+	assoc, ok := m["associations"].(map[string]any)
 	if !ok {
-		return ""
+		return nil
 	}
-	for _, img := range imgs {
-		im, ok := img.(map[string]any)
+	imgs, ok := assoc["images"].([]any)
+	if !ok {
+		return nil
+	}
+	var filenames []string
+	for _, item := range imgs {
+		im, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
 		if fn, ok := im["filename"].(string); ok && fn != "" {
-			return "https://media.camptocamp.org/c2corg_active/" + fn
+			filenames = append(filenames, fn)
 		}
 	}
-	return ""
+	return filenames
 }
 
 // webMercatorToWGS84 converts EPSG:3857 (x, y) to WGS84 (lat, lon).
