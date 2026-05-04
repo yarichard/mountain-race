@@ -62,7 +62,7 @@ export interface RouteDetail {
   elevation_profile?: [number, number][]; // [distance_km, elevation_m] pairs
   gear_text: string;
   pitches: Pitch[];
-  topo_url: string;
+  images?: string[];
   gpx_url: string;
   equipment: Equipment[];
   risks: string[];
