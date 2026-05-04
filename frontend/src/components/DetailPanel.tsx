@@ -116,6 +116,25 @@ export function DetailPanel({ route, loading }: Props) {
                 <ReactMarkdown>{route.description}</ReactMarkdown>
               </div>
             )}
+            {route.images && route.images.length > 0 && (
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                {route.images.map((name) => (
+                  <a
+                    key={name}
+                    href={`/api/images?source=CampToCamp&name=${encodeURIComponent(name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0"
+                  >
+                    <img
+                      src={`/api/images?source=CampToCamp&name=${encodeURIComponent(name)}`}
+                      alt=""
+                      className="h-32 w-auto rounded object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {tab === "map" && (
