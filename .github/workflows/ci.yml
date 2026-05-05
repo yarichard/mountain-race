@@ -26,6 +26,54 @@ jobs:
           path: /tmp/mountain-race.tar.gz
           retention-days: 1
 
+  push:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for OIDC
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load < /tmp/mountain-race.tar.gz
+
+      - name: Set Docker tag
+        id: docker_tag
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="latest"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials (OIDC AssumeRole)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionECRPushRoleForMountainRace
+          aws-region: eu-west-3
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Tag Docker image for ECR
+        run: |
+          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          ECR_REPO="mountain-race"
+          docker tag mountain-race $ECR_REGISTRY/$ECR_REPO:${{ steps.docker_tag.outputs.tag }}
+
+      - name: Push Docker image to ECR
+        run: |
+          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          ECR_REPO="mountain-race"
+          docker push $ECR_REGISTRY/$ECR_REPO:${{ steps.docker_tag.outputs.tag }}
+
   unit-tests-backend:
     name: Backend unit tests
     runs-on: ubuntu-latest
