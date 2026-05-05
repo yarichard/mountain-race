@@ -11,7 +11,9 @@ SYSTEM_PROMPT = """You are a mountain climbing equipment assistant. Parse the fo
 \t- "name": equipment name (string, in french)
 \t- "quantity": number needed (integer, 1 if unspecified)
 \t- "notes": "optional" or "mandatory" (translated in french), plus any relevant detail (string, in french)
-The name of these equipments are related with the mountain activities. You should only point out personal equipment, for instance quickdraws or rope.
+The name of these equipments are related with the mountain activities. You should only point out personal equipment, for instance quickdraws or rope. 
+When equipment refers to a specific size of friends, you should keep it as a separated element. 
+For instance: "camalots #0.75, #1, #2, #3 et éventuellement #4" should remain as 5 different elements with quantity 1, not merged in a single 'camalots' with a quantity of 5.
 You should include only equipment you're absolutely sure about. Output ONLY the JSON array, no explanation."""
 
 def parse_equipment(client, gear_text):
@@ -33,8 +35,8 @@ def main():
         sys.exit(1)
 
     client = OpenAI(api_key=api_key)
-    input_path = "./test.jsonl"
-    output_path = "./test.jsonl.tmp"
+    input_path = sys.argv[1] if len(sys.argv) > 1 else "./test.jsonl"
+    output_path = input_path + ".tmp"
 
     with open(input_path) as fin, open(output_path, "w") as fout:
         for i, line in enumerate(fin, 1):
