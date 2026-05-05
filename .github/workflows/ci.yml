@@ -27,6 +27,7 @@ jobs:
           retention-days: 1
 
   push:
+    name: Push Docker image to AWS ECR
     needs: build
     runs-on: ubuntu-latest
     permissions:

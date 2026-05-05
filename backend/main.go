@@ -12,9 +12,8 @@ import (
 )
 
 func main() {
-	// Load .env from project root (one level up from binary in container)
-	if err := godotenv.Load("../.env"); err != nil {
-		// Try current directory as fallback (dev)
+	if os.Getenv("APP_ENV") != "production" {
+		_ = godotenv.Load("../.env")
 		_ = godotenv.Load(".env")
 	}
 
