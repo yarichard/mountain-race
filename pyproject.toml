@@ -23,5 +23,6 @@ dependencies = [
     "torch>=2.8.0",
     "peft",
     "bitsandbytes",
-    "trl"
+    "trl",
+    "google-genai"
 ]
