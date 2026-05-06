@@ -9,7 +9,6 @@ import (
 
 	"mountain-race/camptocamp"
 	"mountain-race/llm"
-	"os"
 )
 
 type extractEquipmentRequest struct {
@@ -17,12 +16,9 @@ type extractEquipmentRequest struct {
 }
 
 // equipExtract can be replaced in tests to avoid a real LLM call.
-// The provider is selected at runtime via the LLM_PROVIDER env var ("gemini" or "ollama", default "gemini").
+// The provider is selected at runtime via the LLM_PROVIDER env var.
 var equipExtract = func(ctx context.Context, gearText, lang string) ([]llm.EquipmentItem, error) {
-	if os.Getenv("LLM_PROVIDER") == "ollama" {
-		return llm.ExtractEquipmentOllama(ctx, gearText, lang)
-	}
-	return llm.ExtractEquipmentGemini(ctx, gearText, lang)
+	return llm.NewProvider().ExtractEquipment(ctx, gearText, lang)
 }
 
 // ExtractEquipment handles POST /api/equipment/extract

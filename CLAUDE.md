@@ -212,7 +212,21 @@ Layout:
 
 ### Analyzing equipment section
 
-CampToCamp returns a `gear` field that is free-form text. The backend (`backend/llm/`) sends this text to an LLM with a structured prompt (`SYSTEM_PROMPT` in `data/equipment.py`) and expects back a JSON array where each item has three fields: `name` (string, french), `quantity` (integer), and `notes` (`"optionnel"` or `"obligatoire"` plus any relevant detail, in french).
+CampToCamp returns a `gear` field that is free-form text. The backend (`backend/llm/`) sends this text to an LLM with a structured prompt and expects back a JSON array where each item has three fields: `name` (string, french), `quantity` (integer), and `notes` (`"optionnel"` or `"obligatoire"` plus any relevant detail, in french).
+
+#### LLM provider architecture
+
+The `backend/llm/` package uses a provider interface pattern. The active provider is selected at runtime via the `LLM_PROVIDER` environment variable:
+
+- **`provider.go`** — defines the `Provider` interface (`ExtractEquipment(ctx, gearText, lang) ([]EquipmentItem, error)`) and `NewProvider()` factory that reads `LLM_PROVIDER` and returns the appropriate implementation.
+- **`prompts.go`** — shared `EquipmentItem` struct, `jsonArrayRe` regex, and the system/user prompt helpers used by all providers.
+- **`ollama.go`** — `ollamaProvider`; also exposes `ExtractEquipmentOllama` as a package-level function for tests. Configurable via `OLLAMA_URL` (default `http://host.docker.internal:11434`) and `OLLAMA_MODEL` (default `llama3.2`). Uses a 5-minute timeout decoupled from the HTTP request context.
+- **`openai.go`** — `openaiProvider`. Requires `OPENAI_API_KEY`. Configurable via `OPENAI_MODEL` (default `gpt-4o-mini`).
+- **`gemini.go`** — `geminiProvider` (default when `LLM_PROVIDER` is unset). Requires `GEMINI_API_KEY`. Configurable via `GEMINI_MODEL` (default `gemini-2.5-flash-lite`).
+
+`api/equipment.go` calls `llm.NewProvider().ExtractEquipment(...)` — provider selection is entirely contained in the `llm` package.
+
+#### Fine-tuning dataset (data/)
 
 The `data/` folder contains everything needed to fine-tune and evaluate a dedicated model for this parsing task:
 
