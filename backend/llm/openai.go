@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 )
@@ -48,6 +49,7 @@ func ExtractEquipmentOpenAI(ctx context.Context, gearText, lang string) ([]Equip
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
+		log.Println("OPENAI_API_KEY not set, cannot call OpenAI API")
 		return nil, fmt.Errorf("OPENAI_API_KEY not set")
 	}
 

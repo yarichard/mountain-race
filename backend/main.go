@@ -15,6 +15,9 @@ func main() {
 	if os.Getenv("APP_ENV") != "production" {
 		_ = godotenv.Load("../.env")
 		_ = godotenv.Load(".env")
+		log.Println("Loaded environment variables from .env files")
+	} else {
+		log.Println("Running in production mode, skipping .env loading")
 	}
 
 	r := gin.Default()
