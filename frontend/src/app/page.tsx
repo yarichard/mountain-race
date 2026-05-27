@@ -105,7 +105,13 @@ export default function Home() {
       const res = await fetch("/api/export/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...route, weather: weather ?? {} }),
+        body: JSON.stringify({
+          ...route,
+          weather: weather ?? {},
+          participants,
+          objectives,
+          notes,
+        }),
       });
       if (!res.ok) throw new Error("export failed");
       const blob = await res.blob();

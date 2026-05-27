@@ -87,30 +87,57 @@ test.describe("Mountain Race — E2E", () => {
   test("PDF export: POST /api/export/pdf returns application/pdf", async ({ page }) => {
     const body = {
       id: "123456",
-      title: "Test Route",
-      description: "Test",
+      title: "Test Route — Arête des Cosmiques",
+      description: "**L1** Première longueur en 5c\n**L2** Deuxième longueur en 6a\n\n## Descente\nRappels de 30m.",
       difficulty: "5c",
       elevation_gain: 500,
-      distance_km: 5,
-      pitches: [],
-      equipment: [{ item: "Corde", quantity: 1, notes: "" }],
-      risks: ["Risque test"],
+      height_diff_down: 480,
+      distance_km: 5.2,
+      lat: 45.87,
+      lon: 6.88,
+      track: [
+        [45.85, 6.85],
+        [45.87, 6.87],
+        [45.89, 6.89],
+      ],
+      elevation_profile: [
+        [0, 1000],
+        [1, 1200],
+        [2, 1450],
+        [3, 1300],
+        [4, 1100],
+      ],
+      images: [],
+      equipment: [
+        { item: "Corde 60m", quantity: 1, notes: "obligatoire" },
+        { item: "Dégaines", quantity: 10, notes: "obligatoire" },
+      ],
+      risks: ["Risque de chute de pierres", "Conditions météo variables"],
+      alternative_routes: [
+        { id: "789", title: "Voie normale", reason: "Repli en cas de mauvais temps" },
+      ],
       schedule: {
-        estimated_duration_hours: 4,
-        recommended_start_time: "06:00",
+        estimated_duration_hours: 6,
+        recommended_start_time: "05:00",
         recommended_end_time: "14:00",
         source: "formula",
       },
+      participants: [
+        { name: "Alice", climbingLevel: "6a" },
+        { name: "Bob", climbingLevel: "5c" },
+      ],
+      objectives: ["challenge", "fun"],
+      notes: "Prévoir des crampons si neige résiduelle.",
       weather: {
         forecast: {
           date: "2026-05-01",
-          temperature_min_c: 5,
-          temperature_max_c: 15,
+          temperature_min_c: 2,
+          temperature_max_c: 14,
           precipitation_mm: 0,
-          wind_speed_kmh: 20,
+          wind_speed_kmh: 25,
           condition: "sunny",
         },
-        avalanche: { risk_level: 1, risk_label: "Faible", description: "OK" },
+        avalanche: { risk_level: 2, risk_label: "Limité", description: "Risque de plaques en altitude" },
       },
     };
 
@@ -121,6 +148,9 @@ test.describe("Mountain Race — E2E", () => {
     expect([200, 500]).toContain(res.status());
     if (res.status() === 200) {
       expect(res.headers()["content-type"]).toContain("application/pdf");
+      // PDF should be a non-trivial size (> 10 KB) indicating content was rendered
+      const bytes = await res.body();
+      expect(bytes.length).toBeGreaterThan(10_000);
     }
   });
 });
