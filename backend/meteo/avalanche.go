@@ -13,6 +13,15 @@ import (
 
 const dpbraBase = "https://public-api.meteofrance.fr/public/DPBRA/v1"
 
+var dpbraBaseOverride = "" // overridable in tests
+
+func activeDpbraBase() string {
+	if dpbraBaseOverride != "" {
+		return dpbraBaseOverride
+	}
+	return dpbraBase
+}
+
 // AvalancheResult holds the BRA bulletin summary.
 type AvalancheResult struct {
 	RiskLevel   int    `json:"risk_level"`
@@ -75,7 +84,7 @@ func fetchAvalanche(lat, lon float64, date time.Time) (*AvalancheResult, error) 
 		return nil, err
 	}
 
-	req, _ := http.NewRequest("GET", dpbraBase+"/liste-massifs", nil)
+	req, _ := http.NewRequest("GET", activeDpbraBase()+"/liste-massifs", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -109,7 +118,7 @@ func fetchAvalanche(lat, lon float64, date time.Time) (*AvalancheResult, error) 
 		return nil, fmt.Errorf("position %f,%f is not inside any massif", lat, lon)
 	}
 
-	braReq, _ := http.NewRequest("GET", fmt.Sprintf("%s/massif/BRA?id-massif=%d&format=xml", dpbraBase, nearest.ID), nil)
+	braReq, _ := http.NewRequest("GET", fmt.Sprintf("%s/massif/BRA?id-massif=%d&format=xml", activeDpbraBase(), nearest.ID), nil)
 	braReq.Header.Set("Authorization", "Bearer "+token)
 	braResp, err := httpClient.Do(braReq)
 	if err != nil {
@@ -189,7 +198,7 @@ func ProxyMassifImage(w io.Writer, massifID int, imageType string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	url := fmt.Sprintf("%s/massif/image/%s?id-massif=%d", dpbraBase, imageType, massifID)
+	url := fmt.Sprintf("%s/massif/image/%s?id-massif=%d", activeDpbraBase(), imageType, massifID)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := httpClient.Do(req)

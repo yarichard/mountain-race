@@ -16,3 +16,6 @@ uv.lock
 gear_merged/
 generate_gear_dataset
 gear.gguf
+coverage.out
+.claude/agent-memory/                                                                                                                                                     
+.claude/settings.local.json

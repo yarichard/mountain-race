@@ -36,8 +36,12 @@ func ExtractEquipment(c *gin.Context) {
 
 	lang := preferredLang(c.GetHeader("Accept-Language"))
 	items, err := equipExtract(c.Request.Context(), req.GearText, lang)
-	if err != nil || len(items) == 0 {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if len(items) == 0 {
+		c.JSON(http.StatusOK, gin.H{"equipment": []camptocamp.Equipment{}})
 		return
 	}
 
