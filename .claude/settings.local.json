@@ -3,7 +3,10 @@
     "allow": [
       "Bash(go build *)",
       "Bash(npm test *)",
-      "Bash(python .claude/skills/gear-crawler/scripts/enrich_gear.py ./data/gear_dataset_improved.jsonl)"
+      "Bash(python .claude/skills/gear-crawler/scripts/enrich_gear.py ./data/gear_dataset_improved.jsonl)",
+      "Bash(go test *)",
+      "Bash(go tool *)",
+      "Bash(npx jest *)"
     ]
   }
 }

@@ -11,6 +11,8 @@ import (
 	"os"
 )
 
+var openAIBaseURL = "https://api.openai.com/v1/chat/completions" // overridable in tests
+
 type openaiProvider struct{}
 
 func (p *openaiProvider) ExtractEquipment(ctx context.Context, gearText, lang string) ([]EquipmentItem, error) {
@@ -64,7 +66,7 @@ func ExtractEquipmentOpenAI(ctx context.Context, gearText, lang string) ([]Equip
 	}
 	body, _ := json.Marshal(reqBody)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/chat/completions", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, openAIBaseURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("building OpenAI request: %w", err)
 	}

@@ -10,6 +10,12 @@ import (
 
 var baseURL = "https://api.camptocamp.org"
 
+// SetBaseURL overrides the CampToCamp API base URL (for testing).
+func SetBaseURL(u string) { baseURL = u }
+
+// ResetBaseURL restores the CampToCamp API base URL to its default.
+func ResetBaseURL() { baseURL = "https://api.camptocamp.org" }
+
 var httpClient = &http.Client{Timeout: 15 * time.Second}
 
 func get(path string) (map[string]any, error) {

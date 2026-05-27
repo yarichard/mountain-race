@@ -12,7 +12,15 @@ import (
 	"time"
 )
 
+var tokenURLOverride = "" // overridable in tests
 const tokenURL = "https://portail-api.meteofrance.fr/token"
+
+func activeTokenURL() string {
+	if tokenURLOverride != "" {
+		return tokenURLOverride
+	}
+	return tokenURL
+}
 
 type tokenCache struct {
 	mu        sync.Mutex
@@ -38,7 +46,7 @@ func Token() (string, error) {
 	}
 
 	body := url.Values{"grant_type": {"client_credentials"}}
-	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(body.Encode()))
+	req, err := http.NewRequest("POST", activeTokenURL(), strings.NewReader(body.Encode()))
 	if err != nil {
 		return "", err
 	}
