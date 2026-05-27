@@ -348,6 +348,8 @@ func TestExportTemplateRender(t *testing.T) {
 		Track: [][2]float64{
 			{45.8, 6.8}, {45.85, 6.85}, {45.9, 6.9},
 		},
+		Lat:         45.85,
+		Lon:         6.85,
 		GeneratedAt: "27/05/2026 10:00",
 	}
 	plan.DescriptionHTML = markdownToHTML(plan.Description)
@@ -379,6 +381,8 @@ func TestExportTemplateRender(t *testing.T) {
 		"fun",
 		"Notes de test",
 		"Naismith",
+		"GPS",
+		"45.85000",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected HTML to contain %q", want)

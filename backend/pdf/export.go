@@ -659,9 +659,9 @@ const exportTemplate = `<!DOCTYPE html>
   </div>
 </div>
 
-<!-- ── Row 2: Elevation profile + Map (only when data available) ── -->
+<!-- ── Row 2: Elevation profile + Map (always starts on new page) ── -->
 {{if or .ElevationSVG .MapSVG}}
-<div class="row">
+<div class="row" style="break-before:page;page-break-before:always">
   {{if .ElevationSVG}}
   <div class="col2">
     <div class="card">
@@ -674,6 +674,7 @@ const exportTemplate = `<!DOCTYPE html>
   <div class="col">
     <div class="card">
       <h2>Carte</h2>
+      {{if and .Lat .Lon}}<div style="font-size:6.5pt;color:#888;margin-bottom:4px">GPS : {{printf "%.5f" .Lat}}, {{printf "%.5f" .Lon}}</div>{{end}}
       {{.MapSVG}}
     </div>
   </div>
