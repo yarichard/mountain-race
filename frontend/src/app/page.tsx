@@ -111,6 +111,7 @@ export default function Home() {
           participants,
           objectives,
           notes,
+          equipment: equipment ?? [],
         }),
       });
       if (!res.ok) throw new Error("export failed");

@@ -578,7 +578,7 @@ const exportTemplate = `<!DOCTYPE html>
     border-radius: 6px;
     padding: 7px 9px;
   }
-  .description { max-height: 155px; overflow: hidden; font-size: 7.5pt; }
+  .description { font-size: 7.5pt; }
   table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
   td, th { border: 1px solid #ccd; padding: 3px 5px; text-align: left; vertical-align: top; }
   th { background: #1F2782; color: #fff; }
