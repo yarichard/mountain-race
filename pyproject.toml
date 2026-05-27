@@ -24,5 +24,7 @@ dependencies = [
     "peft",
     "bitsandbytes",
     "trl",
-    "google-genai"
+    "google-genai",
+    "openai-agents",
+    "jsonlines"
 ]
