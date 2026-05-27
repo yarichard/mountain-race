@@ -412,7 +412,7 @@ func buildMapSVG(track [][2]float64, lat, lon float64) template.HTML {
 
 	var sb strings.Builder
 	// width:100%;height:auto scales proportionally to the container width.
-	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" style="width:100%%;height:auto;display:block;border-radius:4px">`,
+	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" style="height:185px;width:auto;max-width:100%%;display:block;border-radius:4px">`,
 		svgW, svgH)
 
 	// Blue background in case some tiles are missing.
@@ -503,7 +503,7 @@ func buildMapSVGFallback(points [][2]float64) template.HTML {
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" style="width:100%%;height:auto;display:block;border-radius:4px">`, svgW, svgH)
+	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" style="height:185px;width:auto;max-width:100%%;display:block;border-radius:4px">`, svgW, svgH)
 	sb.WriteString(fmt.Sprintf(`<rect width="%.0f" height="%.0f" fill="#dce8f5" rx="4"/>`, svgW, svgH))
 
 	for i := 0; i <= 3; i++ {
@@ -577,7 +577,6 @@ const exportTemplate = `<!DOCTYPE html>
     border: 1px solid #dde;
     border-radius: 6px;
     padding: 7px 9px;
-    height: 100%;
   }
   .description { max-height: 155px; overflow: hidden; font-size: 7.5pt; }
   table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
@@ -635,18 +634,20 @@ const exportTemplate = `<!DOCTYPE html>
   </div>
   <div class="col">
     <div class="card" style="margin-bottom:8px">
-      <h2>Météo &amp; Avalanche</h2>
+      <h2>Météo{{if .Weather.Avalanche.RiskLevel}} &amp; Avalanche{{end}}</h2>
       <div style="display:flex;gap:12px">
         <div>
-          <div>🌡 {{printf "%.0f" .Weather.Forecast.TemperatureMin}}°C / {{printf "%.0f" .Weather.Forecast.TemperatureMax}}°C</div>
-          <div>🌧 {{printf "%.1f" .Weather.Forecast.Precipitation}} mm</div>
-          <div>💨 {{printf "%.0f" .Weather.Forecast.WindSpeedKmh}} km/h</div>
+          <div><span style="color:#888">Température:</span> {{printf "%.0f" .Weather.Forecast.TemperatureMin}}°C / {{printf "%.0f" .Weather.Forecast.TemperatureMax}}°C</div>
+          <div><span style="color:#888">Précipitations:</span> {{printf "%.1f" .Weather.Forecast.Precipitation}} mm</div>
+          <div><span style="color:#888">Vent:</span> {{printf "%.0f" .Weather.Forecast.WindSpeedKmh}} km/h</div>
         </div>
+        {{if .Weather.Avalanche.RiskLevel}}
         <div>
           <div style="font-size:7pt;color:#888">Risque avalanche</div>
-          <div class="risk-{{.Weather.Avalanche.RiskLevel}}">{{if .Weather.Avalanche.RiskLabel}}{{.Weather.Avalanche.RiskLabel}}{{else}}—{{end}}</div>
+          <div class="risk-{{.Weather.Avalanche.RiskLevel}}">{{.Weather.Avalanche.RiskLabel}}</div>
           {{if .Weather.Avalanche.Description}}<div style="font-size:6.5pt;color:#555;margin-top:2px">{{.Weather.Avalanche.Description}}</div>{{end}}
         </div>
+        {{end}}
       </div>
     </div>
     <div class="card">
