@@ -21,11 +21,14 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// c2cImageBase is a var so tests can override it with an httptest.Server URL.
+// Package-level vars so tests can override them with httptest.Server URLs.
 var (
 	c2cImageBase = "https://media.camptocamp.org/c2corg-active/"
+	osmTileBase  = "https://tile.openstreetmap.org"
 	maxImages    = 4
 )
+
+const tilePx = 256 // OSM tile size in pixels
 
 // ── Data structs ──────────────────────────────────────────────────────────────
 
@@ -268,8 +271,55 @@ func buildElevationSVG(profile [][2]float64) template.HTML {
 	return template.HTML(sb.String())
 }
 
-// ── SVG map ───────────────────────────────────────────────────────────────────
+// ── Tile-based map ────────────────────────────────────────────────────────────
 
+// latLonToTileXY converts WGS84 lat/lon to OSM tile (x, y) at zoom z.
+func latLonToTileXY(lat, lon float64, z int) (int, int) {
+	n := math.Pow(2, float64(z))
+	tx := int(math.Floor((lon + 180.0) / 360.0 * n))
+	latRad := lat * math.Pi / 180.0
+	ty := int(math.Floor((1.0 - math.Log(math.Tan(latRad)+1.0/math.Cos(latRad))/math.Pi) / 2.0 * n))
+	return tx, ty
+}
+
+// selectZoom picks the highest zoom where the bounding box fits in maxCols×maxRows tiles.
+func selectZoom(minLat, maxLat, minLon, maxLon float64, maxCols, maxRows int) int {
+	for z := 15; z >= 8; z-- {
+		tx1, ty1 := latLonToTileXY(maxLat, minLon, z)
+		tx2, ty2 := latLonToTileXY(minLat, maxLon, z)
+		if tx2-tx1+1 <= maxCols && ty2-ty1+1 <= maxRows {
+			return z
+		}
+	}
+	return 8
+}
+
+// fetchTilePNG fetches one OSM raster tile and returns a base64 PNG data URI.
+func fetchTilePNG(z, tx, ty int) (string, error) {
+	u := fmt.Sprintf("%s/%d/%d/%d.png", osmTileBase, z, tx, ty)
+	req, err := http.NewRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "mountain-race-pdf-export/1.0")
+	resp, err := imageClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
+}
+
+// buildMapSVG generates a tile-based map with OSM background and the route
+// overlaid as a polyline. Falls back to a plain geometric SVG when tiles
+// cannot be fetched (offline CI, rate-limiting, etc.).
 func buildMapSVG(track [][2]float64, lat, lon float64) template.HTML {
 	var points [][2]float64
 	if len(track) >= 2 {
@@ -280,13 +330,7 @@ func buildMapSVG(track [][2]float64, lat, lon float64) template.HTML {
 		return ""
 	}
 
-	const (
-		svgW   = 300.0
-		svgH   = 180.0
-		padAll = 14.0
-	)
-
-	// Bounding box
+	// Bounding box with padding
 	minLat, maxLat := points[0][0], points[0][0]
 	minLon, maxLon := points[0][1], points[0][1]
 	for _, p := range points {
@@ -303,8 +347,143 @@ func buildMapSVG(track [][2]float64, lat, lon float64) template.HTML {
 			maxLon = p[1]
 		}
 	}
+	latPad := math.Max((maxLat-minLat)*0.15, 0.003)
+	lonPad := math.Max((maxLon-minLon)*0.15, 0.003)
+	minLat -= latPad
+	maxLat += latPad
+	minLon -= lonPad
+	maxLon += lonPad
 
-	// Padding proportional to bbox (min 0.003° ≈ 300m)
+	// Select zoom: bounding box fits in at most 3 cols × 2 rows of tiles.
+	zoom := selectZoom(minLat, maxLat, minLon, maxLon, 3, 2)
+
+	tx1, ty1 := latLonToTileXY(maxLat, minLon, zoom) // top-left tile
+	tx2, ty2 := latLonToTileXY(minLat, maxLon, zoom) // bottom-right tile
+	if tx2-tx1 > 2 {
+		tx2 = tx1 + 2
+	}
+	if ty2-ty1 > 1 {
+		ty2 = ty1 + 1
+	}
+
+	cols := tx2 - tx1 + 1
+	rows := ty2 - ty1 + 1
+
+	// Fetch tiles in parallel.
+	type cell struct {
+		tx, ty int
+		data   string
+	}
+	fetched := make([]cell, 0, cols*rows)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for ty := ty1; ty <= ty2; ty++ {
+		for tx := tx1; tx <= tx2; tx++ {
+			wg.Add(1)
+			go func(tx, ty int) {
+				defer wg.Done()
+				d, err := fetchTilePNG(zoom, tx, ty)
+				if err == nil {
+					mu.Lock()
+					fetched = append(fetched, cell{tx, ty, d})
+					mu.Unlock()
+				}
+			}(tx, ty)
+		}
+	}
+	wg.Wait()
+
+	// Fall back to plain geometric SVG if no tiles loaded.
+	if len(fetched) == 0 {
+		return buildMapSVGFallback(points)
+	}
+
+	svgW := cols * tilePx
+	svgH := rows * tilePx
+
+	// project converts WGS84 lat/lon to pixel coordinates within the tile grid.
+	project := func(plat, plon float64) (float64, float64) {
+		n := math.Pow(2, float64(zoom))
+		px := (plon+180)/360*n*tilePx - float64(tx1)*tilePx
+		latRad := plat * math.Pi / 180
+		py := (1-math.Log(math.Tan(latRad)+1/math.Cos(latRad))/math.Pi)/2*n*tilePx - float64(ty1)*tilePx
+		return px, py
+	}
+
+	var sb strings.Builder
+	// width:100%;height:auto scales proportionally to the container width.
+	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" style="width:100%%;height:auto;display:block;border-radius:4px">`,
+		svgW, svgH)
+
+	// Blue background in case some tiles are missing.
+	fmt.Fprintf(&sb, `<rect width="%d" height="%d" fill="#dce8f5"/>`, svgW, svgH)
+
+	// Tile images.
+	for _, c := range fetched {
+		x := (c.tx - tx1) * tilePx
+		y := (c.ty - ty1) * tilePx
+		fmt.Fprintf(&sb, `<image x="%d" y="%d" width="%d" height="%d" href="%s"/>`,
+			x, y, tilePx, tilePx, c.data)
+	}
+
+	// Route overlay.
+	if len(points) >= 2 {
+		var ptsStr strings.Builder
+		for _, p := range points {
+			px, py := project(p[0], p[1])
+			fmt.Fprintf(&ptsStr, "%.1f,%.1f ", px, py)
+		}
+		pts := ptsStr.String()
+		// Shadow for contrast against both light and dark tiles.
+		fmt.Fprintf(&sb, `<polyline points="%s" fill="none" stroke="black" stroke-opacity="0.35" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`, pts)
+		fmt.Fprintf(&sb, `<polyline points="%s" fill="none" stroke="#1F2782" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`, pts)
+		// Start marker (green dot).
+		sx, sy := project(points[0][0], points[0][1])
+		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="7" fill="white" stroke="#1F2782" stroke-width="2"/>`, sx, sy)
+		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="4" fill="#4caf50"/>`, sx, sy)
+		// End marker (red dot).
+		ex, ey := project(points[len(points)-1][0], points[len(points)-1][1])
+		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="7" fill="white" stroke="#1F2782" stroke-width="2"/>`, ex, ey)
+		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="4" fill="#f44336"/>`, ex, ey)
+	} else {
+		// Single-point pin.
+		px, py := project(points[0][0], points[0][1])
+		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="10" fill="#1F2782" stroke="white" stroke-width="3"/>`, px, py)
+		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="4" fill="white"/>`, px, py)
+	}
+
+	// Border.
+	fmt.Fprintf(&sb, `<rect width="%d" height="%d" fill="none" stroke="#aaa" stroke-width="1" rx="4"/>`, svgW, svgH)
+
+	sb.WriteString(`</svg>`)
+	return template.HTML(sb.String())
+}
+
+// buildMapSVGFallback renders a plain geometric SVG map (no tiles) for use
+// when OSM tile fetching fails. points must be non-empty.
+func buildMapSVGFallback(points [][2]float64) template.HTML {
+	const (
+		svgW   = 300.0
+		svgH   = 180.0
+		padAll = 14.0
+	)
+
+	minLat, maxLat := points[0][0], points[0][0]
+	minLon, maxLon := points[0][1], points[0][1]
+	for _, p := range points {
+		if p[0] < minLat {
+			minLat = p[0]
+		}
+		if p[0] > maxLat {
+			maxLat = p[0]
+		}
+		if p[1] < minLon {
+			minLon = p[1]
+		}
+		if p[1] > maxLon {
+			maxLon = p[1]
+		}
+	}
 	latPad := math.Max((maxLat-minLat)*0.18, 0.003)
 	lonPad := math.Max((maxLon-minLon)*0.18, 0.003)
 	minLat -= latPad
@@ -324,11 +503,9 @@ func buildMapSVG(track [][2]float64, lat, lon float64) template.HTML {
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" style="width:100%%;height:180px;border-radius:4px">`, svgW, svgH)
-	// Background
+	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" style="width:100%%;height:auto;display:block;border-radius:4px">`, svgW, svgH)
 	sb.WriteString(fmt.Sprintf(`<rect width="%.0f" height="%.0f" fill="#dce8f5" rx="4"/>`, svgW, svgH))
 
-	// Grid lines
 	for i := 0; i <= 3; i++ {
 		gy := padAll + float64(i)*chartH/3
 		gx := padAll + float64(i)*chartW/3
@@ -337,25 +514,20 @@ func buildMapSVG(track [][2]float64, lat, lon float64) template.HTML {
 	}
 
 	if len(points) >= 2 {
-		// Track shadow
 		var ptsStr strings.Builder
 		for _, p := range points {
 			x, y := toXY(p)
 			fmt.Fprintf(&ptsStr, "%.1f,%.1f ", x, y)
 		}
-		fmt.Fprintf(&sb, `<polyline points="%s" fill="none" stroke="rgba(0,0,0,0.2)" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`, ptsStr.String())
-		// Track
+		fmt.Fprintf(&sb, `<polyline points="%s" fill="none" stroke="black" stroke-opacity="0.2" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`, ptsStr.String())
 		fmt.Fprintf(&sb, `<polyline points="%s" fill="none" stroke="#1F2782" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`, ptsStr.String())
-		// Start marker
 		sx, sy := toXY(points[0])
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="4.5" fill="white" stroke="#1F2782" stroke-width="1.5"/>`, sx, sy)
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="2.5" fill="#4caf50"/>`, sx, sy)
-		// End marker
 		ex, ey := toXY(points[len(points)-1])
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="4.5" fill="white" stroke="#1F2782" stroke-width="1.5"/>`, ex, ey)
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="2.5" fill="#f44336"/>`, ex, ey)
 	} else {
-		// Single point marker (pin)
 		x, y := toXY(points[0])
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="7" fill="#1F2782" stroke="white" stroke-width="2"/>`, x, y)
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="3" fill="white"/>`, x, y)

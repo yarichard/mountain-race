@@ -126,6 +126,17 @@ func TestBuildElevationSVG(t *testing.T) {
 }
 
 func TestBuildMapSVG(t *testing.T) {
+	// buildMapSVG tries OSM tiles first; in these tests we point osmTileBase
+	// at a server that returns 404 so the fallback SVG path is exercised.
+	srv404 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer srv404.Close()
+
+	original := osmTileBase
+	osmTileBase = srv404.URL
+	defer func() { osmTileBase = original }()
+
 	t.Run("no track and no lat/lon returns empty", func(t *testing.T) {
 		result := buildMapSVG(nil, 0, 0)
 		if result != "" {
@@ -133,7 +144,7 @@ func TestBuildMapSVG(t *testing.T) {
 		}
 	})
 
-	t.Run("single lat/lon produces SVG with pin", func(t *testing.T) {
+	t.Run("single lat/lon falls back to plain SVG with pin", func(t *testing.T) {
 		result := string(buildMapSVG(nil, 45.9, 6.9))
 		if !strings.Contains(result, "<svg") {
 			t.Error("expected SVG element")
@@ -143,7 +154,7 @@ func TestBuildMapSVG(t *testing.T) {
 		}
 	})
 
-	t.Run("full track produces route polyline with markers", func(t *testing.T) {
+	t.Run("full track falls back to plain SVG with polyline and markers", func(t *testing.T) {
 		track := [][2]float64{
 			{45.8, 6.8},
 			{45.85, 6.85},
@@ -153,9 +164,69 @@ func TestBuildMapSVG(t *testing.T) {
 		if !strings.Contains(result, "<polyline") {
 			t.Error("expected polyline for track")
 		}
-		circleCount := strings.Count(result, "<circle")
-		if circleCount < 4 {
-			t.Errorf("expected at least 4 circle elements (2 per marker with shadow), got %d", circleCount)
+		if strings.Count(result, "<circle") < 4 {
+			t.Error("expected at least 4 circle elements (2 markers × 2 circles)")
+		}
+	})
+}
+
+func TestBuildMapSVGWithTiles(t *testing.T) {
+	// Serve a minimal 1×1 white PNG (smallest valid PNG).
+	minimalPNG := []byte{
+		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG signature
+		0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR chunk length + type
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1×1 pixels
+		0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // 8-bit RGB, CRC
+		0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41, // IDAT chunk
+		0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00,
+		0x00, 0x00, 0x02, 0x00, 0x01, 0xe2, 0x21, 0xbc,
+		0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, // IEND chunk
+		0x44, 0xae, 0x42, 0x60, 0x82,
+	}
+
+	tileSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(minimalPNG) //nolint:errcheck
+	}))
+	defer tileSrv.Close()
+
+	original := osmTileBase
+	osmTileBase = tileSrv.URL
+	defer func() { osmTileBase = original }()
+
+	t.Run("tile fetch succeeds: SVG contains <image> elements", func(t *testing.T) {
+		track := [][2]float64{
+			{45.8, 6.8},
+			{45.85, 6.85},
+			{45.9, 6.9},
+		}
+		result := string(buildMapSVG(track, 45.85, 6.85))
+		if !strings.Contains(result, "<image ") {
+			t.Errorf("expected <image> elements from tile fetch, got: %.200s", result)
+		}
+		if !strings.Contains(result, "data:image/png;base64,") {
+			t.Error("expected base64-encoded tile PNG")
+		}
+		if !strings.Contains(result, "<polyline") {
+			t.Error("expected route polyline overlay")
+		}
+	})
+
+	t.Run("zoom and tile math: selectZoom returns sane value", func(t *testing.T) {
+		z := selectZoom(45.8, 45.9, 6.8, 6.9, 3, 2)
+		if z < 8 || z > 15 {
+			t.Errorf("unexpected zoom %d", z)
+		}
+	})
+
+	t.Run("latLonToTileXY: known Chamonix coordinates", func(t *testing.T) {
+		// Chamonix at zoom 13: x≈4253, y≈2940 (approximate)
+		tx, ty := latLonToTileXY(45.924, 6.869, 13)
+		if tx < 4200 || tx > 4300 {
+			t.Errorf("unexpected tile x=%d for Chamonix", tx)
+		}
+		if ty < 2900 || ty > 3000 {
+			t.Errorf("unexpected tile y=%d for Chamonix", ty)
 		}
 	})
 }
