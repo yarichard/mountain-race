@@ -195,6 +195,7 @@ export default function Home() {
             onWeatherInvalidated={handleWeatherInvalidated}
             objectives={objectives}
             onDateChange={(date) => handleDateChange(date, route)}
+            onParticipantsFromIntent={setParticipants}
           />
         </div>
 

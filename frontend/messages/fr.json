@@ -66,6 +66,13 @@
       "multipitch": "Escalade (multi-longueurs)",
       "ridge_hike": "Randonnée sur arête",
       "hike": "Randonnée"
+    },
+    "intent": {
+      "placeholder": "ex: Une course de crête niveau AD avec 3 amis autour de Chamonix le 15 juillet",
+      "analyze": "Décrire ma course",
+      "analyzing": "Analyse en cours...",
+      "missingHint": "Ce champ est requis",
+      "error": "Impossible d'analyser la description"
     }
   },
   "detail": {
