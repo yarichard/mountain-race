@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations, useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import {
   MULTIPITCH_GRADES,
@@ -11,6 +11,7 @@ import {
   type RouteResult,
   type Participant,
 } from "@/lib/types";
+import { detectLocale } from "@/lib/i18n";
 
 interface Props {
   participants: Participant[];
@@ -67,7 +68,6 @@ export function SearchPanel({
   onParticipantsFromIntent,
 }: Props) {
   const t = useTranslations("search");
-  const locale = useLocale();
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [raceType, setRaceType] = useState<RaceType>("multipitch");
@@ -170,7 +170,7 @@ export function SearchPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: intentText,
-          lang: locale.startsWith("fr") ? "fr" : "en",
+          lang: detectLocale(),
         }),
       });
       if (!res.ok) throw new Error("intent parse failed");
