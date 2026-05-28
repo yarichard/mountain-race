@@ -208,7 +208,6 @@ export function SearchPanel({
       const allPresent =
         requiredFields.every((f) => !missing.includes(f)) &&
         newLocation.trim() !== "" &&
-        newRaceType !== "" &&
         newDate !== "";
 
       if (allPresent) {

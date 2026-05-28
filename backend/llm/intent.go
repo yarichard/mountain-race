@@ -42,7 +42,7 @@ Return ONLY a JSON object with exactly two top-level keys:
 
 The "intent" object may contain:
 - "location": place name or GPS coords (string)
-- "location_type": "name" if a place name, "location" if GPS coords (string)
+- "location_type": by default use "location" only use "name" if user request explicitly for a route name (string)
 - "race_type": one of "multipitch", "ridge_hike", "hike" (string)
 - "difficulty": French sport grade (e.g. "5c") for multipitch; alpine cotation (F, PD, AD, D, TD, ED) for hikes/ridges (string)
 - "date": race date in YYYY-MM-DD format; current year is %d unless the user specifies otherwise (string)
@@ -61,12 +61,12 @@ Retourne UNIQUEMENT un objet JSON avec exactement deux clés de premier niveau :
 - "missing" : un tableau des noms des champs obligatoires que tu N'AS PAS pu déterminer
 
 L'objet "intent" peut contenir :
-- "location" : nom de lieu ou coordonnées GPS (chaîne)
-- "location_type" : "name" si nom de lieu, "location" si coordonnées GPS (chaîne)
-- "race_type" : une des valeurs "multipitch", "ridge_hike", "hike" (chaîne)
-- "difficulty" : cotation sport française (ex : "5c") pour multipitch ; cotation alpine (F, PD, AD, D, TD, ED) pour randonnées/arêtes (chaîne)
-- "date" : date de la course au format YYYY-MM-DD ; l'année en cours est %d sauf indication contraire (chaîne)
-- "participants" : tableau d'objets {"name": chaîne, "climbing_level": chaîne}
+- "location" : nom de lieu ou coordonnées GPS (string)
+- "location_type" : "location" par défaut, utilise seulement"name" si l'utilisateur demande explicitement un nom de route (string)
+- "race_type" : une des valeurs "multipitch", "ridge_hike", "hike" (string)
+- "difficulty" : cotation sport française (ex : "5c") pour multipitch ; cotation alpine (F, PD, AD, D, TD, ED) pour randonnées/arêtes (string)
+- "date" : date de la course au format YYYY-MM-DD ; l'année en cours est %d sauf indication contraire (string)
+- "participants" : tableau d'objets {"name": string, "climbing_level": string}
 
 Champs obligatoires : "location", "location_type", "race_type", "date".
 Champs optionnels : "difficulty", "participants".
