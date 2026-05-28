@@ -68,7 +68,7 @@
       "hike": "Randonnée"
     },
     "intent": {
-      "placeholder": "ex: Une course de crête niveau AD avec 3 amis autour de Chamonix le 15 juillet",
+      "placeholder": "ex: une grande voie autour de la ville de Chamonix, le 30/05, avec Seb et Tim. Seb a un niveau 6c, Tim plutot 8a",
       "analyze": "Décrire ma course",
       "analyzing": "Analyse en cours...",
       "missingHint": "Ce champ est requis",
