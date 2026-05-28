@@ -66,6 +66,13 @@
       "multipitch": "Multi-pitch climbing",
       "ridge_hike": "Ridge hike",
       "hike": "Hike"
+    },
+    "intent": {
+      "placeholder": "e.g. A ridge hike at AD level with 3 friends around Chamonix on July 15th",
+      "analyze": "Describe my race",
+      "analyzing": "Analyzing...",
+      "missingHint": "This field is required",
+      "error": "Could not analyze the description"
     }
   },
   "detail": {

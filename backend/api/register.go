@@ -13,4 +13,5 @@ func Register(r *gin.Engine) {
 	g.GET("/avalanche/image", GetAvalancheImage)
 	g.GET("/images", GetImage)
 	g.POST("/export/pdf", ExportPDF)
+	g.POST("/intent/parse", ParseIntentHandler)
 }

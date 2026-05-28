@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useEffect, useState } from "react";
 import {
   MULTIPITCH_GRADES,
@@ -18,6 +18,7 @@ interface Props {
   onRouteSelected: (id: string, date: string) => void;
   onWeatherInvalidated?: () => void;
   onDateChange?: (date: string) => void;
+  onParticipantsFromIntent?: (participants: Participant[]) => void;
 }
 
 function gradeIndexInClimbing(g: string): number {
@@ -51,8 +52,22 @@ function hasPermissiveObjective(objectives: string[]): boolean {
   return objectives.some((o) => o === "challenge" || o === "performance");
 }
 
-export function SearchPanel({ participants, objectives, onRouteSelected, onWeatherInvalidated, onDateChange }: Props) {
+function missingClass(fieldName: string, missingFields: string[]): string {
+  return missingFields.includes(fieldName)
+    ? "border-red-500 ring-1 ring-red-500"
+    : "border-[var(--border)]";
+}
+
+export function SearchPanel({
+  participants,
+  objectives,
+  onRouteSelected,
+  onWeatherInvalidated,
+  onDateChange,
+  onParticipantsFromIntent,
+}: Props) {
   const t = useTranslations("search");
+  const locale = useLocale();
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [raceType, setRaceType] = useState<RaceType>("multipitch");
@@ -66,14 +81,18 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
     hasPermissiveObjective(objectives)
   );
 
-  // Sync checkbox default when objectives change.
+  // Intent state
+  const [intentText, setIntentText] = useState("");
+  const [intentAnalyzing, setIntentAnalyzing] = useState(false);
+  const [intentError, setIntentError] = useState(false);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+
   useEffect(() => {
     setAllowAbove(hasPermissiveObjective(objectives));
   }, [objectives]);
 
   const allGrades = raceType === "multipitch" ? MULTIPITCH_GRADES : ALPINE_GRADES;
 
-  // Lowest climbing level among participants with a valid level set.
   const filledParticipants = participants.filter((p) => p.name.trim() !== "");
   const lowestLevel =
     filledParticipants.length === 0
@@ -84,7 +103,6 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
           return pi >= 0 && (mi < 0 || pi < mi) ? p.climbingLevel : min;
         }, filledParticipants[0].climbingLevel);
 
-  // Grades shown in the difficulty dropdown, filtered when allowAbove is false.
   const visibleGrades = allGrades.filter((g) => {
     if (!lowestLevel || allowAbove) return true;
     const color = gradeColor(g, lowestLevel, raceType);
@@ -95,9 +113,22 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
     setRaceType(rt);
     const defaultDiff = rt === "multipitch" ? "5c" : "AD";
     setDifficulty(defaultDiff);
+    setMissingFields((prev) => prev.filter((f) => f !== "race_type"));
   };
 
-  const search = async () => {
+  const search = async (overrides?: {
+    location?: string;
+    locationType?: "name" | "location";
+    raceType?: RaceType;
+    difficulty?: string;
+    date?: string;
+  }) => {
+    const _date = overrides?.date ?? date;
+    const _raceType = overrides?.raceType ?? raceType;
+    const _difficulty = overrides?.difficulty ?? difficulty;
+    const _location = overrides?.location ?? location;
+    const _locationType = overrides?.locationType ?? locationType;
+
     onWeatherInvalidated?.();
     setSearching(true);
     setResults(null);
@@ -106,13 +137,13 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          location,
-          location_type: locationType,
-          race_type: raceType,
-          difficulty,
+          location: _location,
+          location_type: _locationType,
+          race_type: _raceType,
+          difficulty: _difficulty,
           allow_above: allowAbove,
-          date,
-          radius_km: locationType === "location" ? radiusKm : undefined,
+          date: _date,
+          radius_km: _locationType === "location" ? radiusKm : undefined,
           participants: participants.map((p) => ({
             name: p.name,
             climbing_level: p.climbingLevel,
@@ -128,25 +159,124 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
     }
   };
 
+  const analyzeIntent = async () => {
+    if (!intentText.trim()) return;
+    setIntentAnalyzing(true);
+    setIntentError(false);
+    setMissingFields([]);
+    try {
+      const res = await fetch("/api/intent/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: intentText,
+          lang: locale.startsWith("fr") ? "fr" : "en",
+        }),
+      });
+      if (!res.ok) throw new Error("intent parse failed");
+      const data = await res.json();
+
+      // Merge intent fields into form state
+      const newDate = data.intent?.date || date;
+      const newRaceType: RaceType = (data.intent?.race_type as RaceType) || raceType;
+      const newDifficulty = data.intent?.difficulty || difficulty;
+      const newLocation = data.intent?.location || location;
+      const newLocationType: "name" | "location" =
+        (data.intent?.location_type as "name" | "location") || locationType;
+
+      if (data.intent?.date) { setDate(newDate); onDateChange?.(newDate); }
+      if (data.intent?.race_type) {
+        setRaceType(newRaceType);
+        if (!data.intent?.difficulty) setDifficulty(newRaceType === "multipitch" ? "5c" : "AD");
+      }
+      if (data.intent?.difficulty) setDifficulty(newDifficulty);
+      if (data.intent?.location) setLocation(newLocation);
+      if (data.intent?.location_type) setLocationType(newLocationType);
+
+      if (data.intent?.participants && onParticipantsFromIntent) {
+        const mapped: Participant[] = (
+          data.intent.participants as Array<{ name: string; climbing_level: string }>
+        ).map((p) => ({ name: p.name, climbingLevel: p.climbing_level }));
+        onParticipantsFromIntent(mapped);
+      }
+
+      const missing: string[] = data.missing ?? [];
+      setMissingFields(missing);
+
+      // Auto-trigger search if all required fields are now present
+      const requiredFields = ["location", "race_type", "date"];
+      const allPresent =
+        requiredFields.every((f) => !missing.includes(f)) &&
+        newLocation.trim() !== "" &&
+        newRaceType !== "" &&
+        newDate !== "";
+
+      if (allPresent) {
+        await search({
+          location: newLocation,
+          locationType: newLocationType,
+          raceType: newRaceType,
+          difficulty: newDifficulty,
+          date: newDate,
+        });
+      }
+    } catch {
+      setIntentError(true);
+    } finally {
+      setIntentAnalyzing(false);
+    }
+  };
+
   return (
     <div className="panel flex flex-col h-full">
       <div className="panel-header">{t("title")}</div>
       <div className="panel-body flex-1 overflow-y-auto space-y-2">
+
+        {/* Intent textarea + analyze button */}
+        <div>
+          <textarea
+            className="w-full border border-[var(--border)] rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary)] resize-none"
+            rows={2}
+            placeholder={t("intent.placeholder")}
+            value={intentText}
+            onChange={(e) => { setIntentText(e.target.value); setIntentError(false); }}
+          />
+          {intentError && (
+            <p className="text-xs text-red-600 mt-0.5">{t("intent.error")}</p>
+          )}
+          <button
+            onClick={analyzeIntent}
+            disabled={intentAnalyzing || !intentText.trim()}
+            className="mt-1 w-full bg-[var(--primary)] hover:bg-[var(--primary-light)] text-white font-semibold text-xs py-1.5 rounded transition disabled:opacity-60"
+          >
+            {intentAnalyzing ? t("intent.analyzing") : t("intent.analyze")}
+          </button>
+        </div>
+
+        <hr className="border-[var(--border)]" />
+
         {/* Date */}
         <div>
           <label className="block text-xs font-semibold text-[var(--text-muted)] mb-0.5">{t("date")}</label>
           <input
             type="date"
-            className="w-full border border-[var(--border)] rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+            className={`w-full rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary)] border ${missingClass("date", missingFields)}`}
             value={date}
-            onChange={(e) => { setDate(e.target.value); onDateChange?.(e.target.value); }}
+            onChange={(e) => {
+              setDate(e.target.value);
+              onDateChange?.(e.target.value);
+              setMissingFields((prev) => prev.filter((f) => f !== "date"));
+            }}
           />
+          {missingFields.includes("date") && (
+            <p className="text-xs text-red-600 mt-0.5">{t("intent.missingHint")}</p>
+          )}
         </div>
 
         {/* Race type */}
         <div>
           <label className="block text-xs font-semibold text-[var(--text-muted)] mb-0.5">{t("raceType")}</label>
-          <div className="flex gap-1">
+          <div className={`flex gap-1 rounded ${missingFields.includes("race_type") ? "ring-1 ring-red-500" : ""}`}>
             {(["multipitch", "ridge_hike", "hike"] as RaceType[]).map((rt) => (
               <button
                 key={rt}
@@ -161,6 +291,9 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
               </button>
             ))}
           </div>
+          {missingFields.includes("race_type") && (
+            <p className="text-xs text-red-600 mt-0.5">{t("intent.missingHint")}</p>
+          )}
         </div>
 
         {/* Difficulty */}
@@ -188,7 +321,6 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
             })}
           </select>
 
-          {/* Allow-above checkbox */}
           <label className="flex items-center gap-1.5 mt-1 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -221,11 +353,17 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
             </div>
           </div>
           <input
-            className="w-full border border-[var(--border)] rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+            className={`w-full rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary)] border ${missingClass("location", missingFields)}`}
             placeholder={locationType === "location" ? t("locationPlaceholderGeo") : t("locationPlaceholder")}
             value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            onChange={(e) => {
+              setLocation(e.target.value);
+              setMissingFields((prev) => prev.filter((f) => f !== "location"));
+            }}
           />
+          {missingFields.includes("location") && (
+            <p className="text-xs text-red-600 mt-0.5">{t("intent.missingHint")}</p>
+          )}
         </div>
 
         {/* Radius — only for area/location mode */}
@@ -245,7 +383,7 @@ export function SearchPanel({ participants, objectives, onRouteSelected, onWeath
 
         {/* Search button */}
         <button
-          onClick={search}
+          onClick={() => search()}
           disabled={searching}
           className="w-full bg-[var(--primary)] hover:bg-[var(--primary-light)] text-white font-semibold text-sm py-2 rounded transition disabled:opacity-60"
         >
