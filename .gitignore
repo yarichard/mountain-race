@@ -19,3 +19,4 @@ gear.gguf
 coverage.out
 .claude/agent-memory/                                                                                                                                                     
 .claude/settings.local.json
+__debug_*

@@ -17,7 +17,7 @@ type parseIntentRequest struct {
 
 // intentParse can be replaced in tests to avoid a real LLM call.
 var intentParse = func(ctx context.Context, text, lang string) (*llm.ParseIntentResult, error) {
-	return llm.NewIntentProvider().ParseRaceIntent(ctx, text, lang)
+	return llm.NewProvider().ParseRaceIntent(ctx, text, lang)
 }
 
 // ParseIntentHandler handles POST /api/intent/parse

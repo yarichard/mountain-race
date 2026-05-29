@@ -8,6 +8,7 @@ import (
 // Provider is the common interface for all LLM backends.
 type Provider interface {
 	ExtractEquipment(ctx context.Context, gearText, lang string) ([]EquipmentItem, error)
+	ParseRaceIntent(ctx context.Context, text, lang string) (*ParseIntentResult, error)
 }
 
 // NewProvider returns the Provider selected by the LLM_PROVIDER env var.

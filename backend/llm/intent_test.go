@@ -8,58 +8,6 @@ import (
 	"testing"
 )
 
-// --- NewIntentProvider ---
-
-func TestNewIntentProvider_DefaultIsGemini(t *testing.T) {
-	t.Setenv("INTENT_LLM_PROVIDER", "")
-	p := NewIntentProvider()
-	if _, ok := p.(*geminiIntentProvider); !ok {
-		t.Errorf("expected geminiIntentProvider, got %T", p)
-	}
-}
-
-func TestNewIntentProvider_Ollama(t *testing.T) {
-	t.Setenv("INTENT_LLM_PROVIDER", "ollama")
-	p := NewIntentProvider()
-	if _, ok := p.(*ollamaIntentProvider); !ok {
-		t.Errorf("expected ollamaIntentProvider, got %T", p)
-	}
-}
-
-func TestNewIntentProvider_OpenAI(t *testing.T) {
-	t.Setenv("INTENT_LLM_PROVIDER", "openai")
-	p := NewIntentProvider()
-	if _, ok := p.(*openaiIntentProvider); !ok {
-		t.Errorf("expected openaiIntentProvider, got %T", p)
-	}
-}
-
-func TestNewIntentProvider_UnknownFallsBackToGemini(t *testing.T) {
-	t.Setenv("INTENT_LLM_PROVIDER", "unknown")
-	p := NewIntentProvider()
-	if _, ok := p.(*geminiIntentProvider); !ok {
-		t.Errorf("expected geminiIntentProvider as fallback, got %T", p)
-	}
-}
-
-// --- intentModel ---
-
-func TestIntentModel_UsesINTENT_LLM_MODEL(t *testing.T) {
-	t.Setenv("INTENT_LLM_MODEL", "my-model")
-	got := intentModel("default-model")
-	if got != "my-model" {
-		t.Errorf("expected my-model, got %q", got)
-	}
-}
-
-func TestIntentModel_FallsBackToProviderDefault(t *testing.T) {
-	t.Setenv("INTENT_LLM_MODEL", "")
-	got := intentModel("provider-default")
-	if got != "provider-default" {
-		t.Errorf("expected provider-default, got %q", got)
-	}
-}
-
 // --- parseIntentJSON ---
 
 func TestParseIntentJSON_ValidObject(t *testing.T) {
@@ -260,7 +208,6 @@ func TestParseRaceIntentOllama_HTTPError(t *testing.T) {
 // --- ambiguous race_type ---
 
 func TestParseIntentJSON_AmbiguousRaceType(t *testing.T) {
-	// LLM is uncertain about race_type, leaves it out of intent
 	raw := `{"intent":{"location":"Chamonix","location_type":"name","date":"2025-07-15"},"missing":["race_type"]}`
 	result, err := parseIntentJSON(raw)
 	if err != nil {
