@@ -117,6 +117,13 @@ mountain-race/
 ## 5. Environment Variables
 - **METEOFRANCE_USER**: MeteoFrance API username, used to generate a Bearer token for the avalanche (DPBRA) API
 - **METEOFRANCE_PASS**: MeteoFrance API password, used to generate a Bearer token for the avalanche (DPBRA) API
+- **LLM_PROVIDER**: LLM backend for equipment extraction and intent parsing. Values: `gemini` (default), `openai`, `ollama`
+- **GEMINI_API_KEY**: Gemini API key (required when `LLM_PROVIDER=gemini`)
+- **GEMINI_MODEL**: Gemini model override (default: `gemini-2.5-flash-lite`)
+- **OPENAI_API_KEY**: OpenAI API key (required when `LLM_PROVIDER=openai`)
+- **OPENAI_MODEL**: OpenAI model override (default: `gpt-4o-mini`)
+- **OLLAMA_URL**: Ollama base URL (default: `http://host.docker.internal:11434`)
+- **OLLAMA_MODEL**: Ollama model name (default: `llama3.2`)
 
 ### Behavior
 
@@ -146,6 +153,17 @@ Search for routes matching user criteria via CampToCamp.
   ]
 }
 ```
+
+---
+
+#### `POST /api/intent/parse`
+Parse a natural-language race description into structured search parameters.
+
+**Request body:** `{ "text": "grande voie à Argis le 30/06", "lang": "fr" }`
+
+**Response:** `{ "intent": { "location": "Argis", "location_type": "location", "race_type": "multipitch", "date": "2026-06-30" }, "missing": [] }`
+
+`missing` lists any required fields (`location`, `location_type`, `race_type`, `date`) that the LLM could not determine. Optional fields (`difficulty`, `participants`) are never listed in `missing`.
 
 ---
 
@@ -216,15 +234,23 @@ CampToCamp returns a `gear` field that is free-form text. The backend (`backend/
 
 #### LLM provider architecture
 
-The `backend/llm/` package uses a provider interface pattern. The active provider is selected at runtime via the `LLM_PROVIDER` environment variable:
+The `backend/llm/` package exposes a single `Provider` interface used for **both** equipment extraction and intent parsing. The active provider is selected at runtime via the `LLM_PROVIDER` environment variable:
 
-- **`provider.go`** — defines the `Provider` interface (`ExtractEquipment(ctx, gearText, lang) ([]EquipmentItem, error)`) and `NewProvider()` factory that reads `LLM_PROVIDER` and returns the appropriate implementation.
-- **`prompts.go`** — shared `EquipmentItem` struct, `jsonArrayRe` regex, and the system/user prompt helpers used by all providers.
-- **`ollama.go`** — `ollamaProvider`; also exposes `ExtractEquipmentOllama` as a package-level function for tests. Configurable via `OLLAMA_URL` (default `http://host.docker.internal:11434`) and `OLLAMA_MODEL` (default `llama3.2`). Uses a 5-minute timeout decoupled from the HTTP request context.
+- **`provider.go`** — defines the `Provider` interface with two methods: `ExtractEquipment(ctx, gearText, lang)` and `ParseRaceIntent(ctx, text, lang)`. `NewProvider()` reads `LLM_PROVIDER` and returns the appropriate implementation.
+- **`prompts.go`** — all shared types (`EquipmentItem`, `RaceIntent`, `ParseIntentResult`), regex helpers (`jsonArrayRe`, `jsonObjectRe`), and all system/user prompt functions for both tasks. `parseIntentJSON` also filters out optional field names from the `missing` array to compensate for small-model quirks.
+- **`ollama.go`** — `ollamaProvider` implementing both methods. Configurable via `OLLAMA_URL` (default `http://host.docker.internal:11434`) and `OLLAMA_MODEL` (default `llama3.2`). Uses a 5-minute timeout decoupled from the HTTP request context. Also exposes `ExtractEquipmentOllama` and `ParseRaceIntentOllama` as package-level functions for tests.
 - **`openai.go`** — `openaiProvider`. Requires `OPENAI_API_KEY`. Configurable via `OPENAI_MODEL` (default `gpt-4o-mini`).
 - **`gemini.go`** — `geminiProvider` (default when `LLM_PROVIDER` is unset). Requires `GEMINI_API_KEY`. Configurable via `GEMINI_MODEL` (default `gemini-2.5-flash-lite`).
 
-`api/equipment.go` calls `llm.NewProvider().ExtractEquipment(...)` — provider selection is entirely contained in the `llm` package.
+`api/equipment.go` calls `llm.NewProvider().ExtractEquipment(...)` and `api/intent.go` calls `llm.NewProvider().ParseRaceIntent(...)` — provider selection is entirely contained in the `llm` package.
+
+#### Intent parsing (`POST /api/intent/parse`)
+
+The natural-language intent parser converts a free-form description ("grande voie à Argis le 30/06") into structured search parameters. The prompt in `prompts.go#intentSystemPrompt` handles:
+- French climbing synonyms: "grande voie" → `multipitch`, "arête" → `ridge_hike`, "randonnée" → `hike`
+- French date formats: "30/06" → `2026-06-30`, "15 août" → `2026-08-15`
+- `location_type` defaulting to `"location"` (set to `"name"` only for explicit route names like "voie Rébuffat")
+- `parseIntentJSON` filters optional fields (`difficulty`, `participants`) from the `missing` array programmatically, since small models ignore the prompt instruction
 
 #### Fine-tuning dataset (data/)
 

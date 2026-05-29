@@ -8,10 +8,11 @@ A single-page application to help plan mountain races with a group of friends. E
 ## Features
 
 - **Route search** — searches [CampToCamp](https://www.camptocamp.org) by route name or geographic area (geocoded via OpenStreetMap Nominatim)
+- **Natural-language search** — describe a race in plain French or English ("grande voie à Argis le 30/06") and the LLM extracts all search parameters automatically
 - **Route detail** — topo/description, interactive map (real GPS from C2C), elevation profile, pitch-by-pitch breakdown for multi-pitch climbs
-- **Weather & avalanche** — MeteoFrance AROME/ARPEGE forecast + DPBRA avalanche bulletin
+- **Weather & avalanche** — Open-Meteo forecast (MeteoFrance seamless model for ≤4 days, global model beyond) + MeteoFrance DPBRA avalanche bulletin with massif images
 - **Schedule** — estimated duration from CampToCamp data or Naismith's rule fallback
-- **Equipment list** — sourced from CampToCamp gear data
+- **Equipment list** — gear text from CampToCamp parsed into a structured list by an LLM
 - **PDF export** — full race plan exported as landscape A4 via headless Chromium
 - **Bilingual** — French and English, auto-detected from the browser
 
@@ -32,13 +33,14 @@ A single-page application to help plan mountain races with a group of friends. E
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 16 · TypeScript · Tailwind CSS · next-intl |
-| Backend | Go 1.26 · Gin · chromedp |
+| Frontend | Next.js · TypeScript · Tailwind CSS · next-intl |
+| Backend | Go · Gin · chromedp |
 | Maps | Leaflet / react-leaflet |
 | Charts | Recharts |
 | Geocoding | OpenStreetMap Nominatim (no key required) |
 | Route data | CampToCamp anonymous read-only API |
-| Weather | MeteoFrance AROME / ARPEGE / DPBRA APIs |
+| Weather | Open-Meteo (forecast) · MeteoFrance DPBRA (avalanche) |
+| LLM | Gemini (default) · OpenAI · Ollama |
 
 ---
 
@@ -63,14 +65,16 @@ Nothing is installed on the host machine when using the devcontainer — see [De
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your MeteoFrance credentials:
+Edit `.env` and fill in your credentials:
 
 ```
 METEOFRANCE_USER=your_username
 METEOFRANCE_PASS=your_password
+GEMINI_API_KEY=your_gemini_key
 ```
 
-> MeteoFrance credentials are required for real weather data. Without them the weather panel shows mock data.
+> MeteoFrance credentials are required for the avalanche bulletin. Without them the avalanche panel shows mock data (risk level 2, no massif image).
+> `GEMINI_API_KEY` is required for equipment extraction and natural-language intent parsing when `LLM_PROVIDER=gemini` (the default).
 
 ### 2. Build and run with Docker
 
@@ -143,9 +147,11 @@ mountain-race/
 │   ├── main.go                 # Entry point: .env loading, router, static serving
 │   ├── api/                    # HTTP handlers
 │   ├── camptocamp/             # CampToCamp API client + unit tests
-│   ├── meteo/                  # MeteoFrance token, forecast, avalanche
-│   ├── schedule/               # Naismith's rule
-│   └── pdf/                    # headless Chromium PDF export
+│   ├── llm/                    # LLM provider abstraction (Gemini/OpenAI/Ollama)
+│   ├── meteo/                  # Open-Meteo forecast + MeteoFrance DPBRA avalanche
+│   ├── schedule/               # Naismith's rule duration estimator
+│   └── pdf/                    # Headless Chromium PDF export
+├── data/                       # Fine-tuning dataset and notebooks for the gear LLM
 ├── planning/
 │   └── plan.md                 # Build plan and implementation status
 ├── Makefile
@@ -180,7 +186,7 @@ Search CampToCamp for routes matching the criteria.
 ```
 
 - `location_type`: `"name"` searches by route name (C2C `q` param); `"location"` geocodes the text and searches by bounding box (20 km radius)
-- `location`: free text, place name, or `"lat,lon"` (the `lat,lon` format bypasses Nominatim for `"location"` type)
+- `location`: free text, place name, or `"lat,lon"` (bypasses Nominatim for `"location"` type)
 - `difficulty`: French sport grade (`5c`, `6a+`, …) for `multipitch`; alpine cotation (`F`, `PD`, `AD`, `D`, `TD`, `ED`) for hikes
 
 **Response `200`:**
@@ -199,6 +205,31 @@ Search CampToCamp for routes matching the criteria.
   ]
 }
 ```
+
+---
+
+### `POST /api/intent/parse`
+
+Parse a natural-language race description into structured search parameters. Used by the frontend search bar.
+
+```json
+{ "text": "grande voie à Argis le 30/06", "lang": "fr" }
+```
+
+**Response `200`:**
+```json
+{
+  "intent": {
+    "location": "Argis",
+    "location_type": "location",
+    "race_type": "multipitch",
+    "date": "2026-06-30"
+  },
+  "missing": []
+}
+```
+
+`missing` lists required fields the LLM could not determine (`location`, `location_type`, `race_type`, `date`). The frontend uses this to prompt the user for the missing values.
 
 ---
 
@@ -223,7 +254,7 @@ Full detail for a CampToCamp route.
   "topo_url": "https://media.camptocamp.org/...",
   "gpx_url": "",
   "equipment": [
-    { "item": "Corde 60m", "quantity": 1, "notes": "Simple" }
+    { "name": "Corde 60m", "quantity": 1, "notes": "obligatoire" }
   ],
   "risks": ["Chutes de pierres en début de journée"],
   "alternative_routes": [
@@ -256,23 +287,34 @@ Weather forecast and avalanche risk for a location and date.
     "temperature_max_c": 22.0,
     "precipitation_mm": 0.0,
     "wind_speed_kmh": 15.0,
-    "condition": "sunny"
+    "hourly": [
+      { "hour": 6, "temperature_c": 10.5, "wind_speed_kmh": 12.0 }
+    ]
   },
   "avalanche": {
     "risk_level": 2,
     "risk_label": "Limité",
-    "description": "Risque faible en altitude..."
+    "massif_id": 15,
+    "massif_name": "Belledonne"
   }
 }
 ```
 
-Uses MeteoFrance **AROME** (≤ 48 h) or **ARPEGE** (> 48 h) for the forecast, and **DPBRA** for the avalanche bulletin.
+For dates within 4 days: uses Open-Meteo with `models=meteofrance_seamless` and `temperature_100m`. Beyond 4 days: uses the global Open-Meteo API with `temperature_120m`. Avalanche data requires MeteoFrance credentials; falls back to `risk_level=2` (no `massif_id`) when unavailable.
+
+---
+
+### `GET /api/avalanche/image?massif_id=15&type=montagne-risques`
+
+Proxy for MeteoFrance DPBRA massif images. Requires Bearer auth — the backend handles the token transparently.
+
+`type` must be one of: `montagne-risques`, `apercu-meteo`, `sept-derniers-jours`.
 
 ---
 
 ### `POST /api/export/pdf`
 
-Generate a PDF of the full race plan. Request body is the `GET /api/routes/:id` response shape plus a `weather` block. Returns `application/pdf`.
+Generate a PDF of the full race plan. Request body is the `GET /api/routes/:id` response shape plus a `weather` block. Returns `application/pdf` (landscape A4).
 
 ---
 
@@ -280,16 +322,52 @@ Generate a PDF of the full race plan. Request body is the `GET /api/routes/:id` 
 
 | Variable | Description | Required |
 |---|---|---|
-| `METEOFRANCE_USER` | MeteoFrance API username | For real weather data |
-| `METEOFRANCE_PASS` | MeteoFrance API password | For real weather data |
+| `METEOFRANCE_USER` | MeteoFrance API username | For avalanche data |
+| `METEOFRANCE_PASS` | MeteoFrance API password | For avalanche data |
+| `LLM_PROVIDER` | LLM backend: `gemini` (default), `openai`, `ollama` | No |
+| `GEMINI_API_KEY` | Gemini API key | When `LLM_PROVIDER=gemini` |
+| `GEMINI_MODEL` | Gemini model name (default: `gemini-2.5-flash-lite`) | No |
+| `OPENAI_API_KEY` | OpenAI API key | When `LLM_PROVIDER=openai` |
+| `OPENAI_MODEL` | OpenAI model name (default: `gpt-4o-mini`) | No |
+| `OLLAMA_URL` | Ollama base URL (default: `http://host.docker.internal:11434`) | When `LLM_PROVIDER=ollama` |
+| `OLLAMA_MODEL` | Ollama model name (default: `llama3.2`) | No |
+| `HF_TOKEN` | HuggingFace token for dataset push | For fine-tuning only |
 
-The backend loads `.env` from the project root (or the parent of the binary directory inside Docker).
+`LLM_PROVIDER` controls both equipment extraction and natural-language intent parsing. The backend loads `.env` from the project root.
+
+---
+
+## LLM Integration
+
+The `backend/llm/` package provides a single `Provider` interface used for two tasks:
+
+- **Equipment extraction** — converts CampToCamp's free-form `gear` text into a structured JSON array (`name`, `quantity`, `notes`)
+- **Intent parsing** — converts a natural-language race description into structured search parameters (`location`, `race_type`, `date`, etc.)
+
+Provider is selected at runtime via `LLM_PROVIDER`. All prompts live in `backend/llm/prompts.go`.
+
+### Fine-tuning a dedicated gear model
+
+The `data/` folder contains everything to fine-tune a smaller model specifically for gear extraction:
+
+1. Generate the dataset: `cd backend && go run ./cmd/generate_gear_dataset`
+2. Clean and prepare: `data/gear_preparing.ipynb` (run locally)
+3. Train: `data/gear_training.ipynb` (run on Google Colab with GPU)
+4. Evaluate: `data/gear_testing.ipynb`
+5. (Optional) Convert for Ollama local use:
+   ```bash
+   hf download yrichard/gear_training-2026-04-28_13.15.01-merged --local-dir ./data/gear_merged
+   python ../llama.cpp/convert_hf_to_gguf.py ./gear_merged --outfile ./data/gear.gguf --outtype q8_0
+   ollama create gear-assistant -f Modelfile
+   ```
+
+![Training](./data/wandb_training.png)
 
 ---
 
 ## Devcontainer
 
-The project uses a VS Code devcontainer defined in `Dockerfile.devcontainer`. It provides Go, Node.js, and all required system libraries (`libeccodes-dev`, etc.) without installing anything on the host machine.
+The project uses a VS Code devcontainer defined in `Dockerfile.devcontainer`. It provides Go, Node.js, and all required system libraries without installing anything on the host machine.
 
 To use it: open the project in VS Code and select **Reopen in Container** when prompted.
 
@@ -301,21 +379,8 @@ To use it: open the project in VS Code and select **Reopen in Container** when p
 
 | Area | Status |
 |---|---|
-| **Weather forecast (GRIB2)** | `meteo/forecast.go` is a stub returning mock data. Real GRIB2 decoding via `github.com/meteocima/eccodes-go` is not yet implemented. `libeccodes-dev` is installed in the Docker image and ready. |
-| **Weather uses route GPS** | The frontend currently passes hardcoded coordinates (`lat=45.9&lon=6.9`) to `/api/weather`. It should use the route's real `lat`/`lon` from the detail response. |
 | **Elevation profile** | The chart shows a synthetic bell-curve based on elevation gain and distance. Real GPX track decoding is not yet implemented. |
 | **Nominatim rate limit** | The geocoding endpoint is subject to Nominatim's public 1 req/s limit. Production use should add caching or a self-hosted instance. |
+| **Intent parsing with small models** | `llama3.2` handles the main cases (location, race type, French dates) but is unreliable for participants and `location_type`. Gemini and OpenAI work correctly for all cases. |
 | **Frontend unit tests** | React Testing Library tests are planned but not yet written. |
 | **E2E tests** | Playwright test suite (`test/`) is planned but not yet implemented. |
-
-## Training gear equipment model
-- Generate jsonl file using **generate_gear_dataset go helper
-- Clean & prepare data using gear_preparing.ipynb locally
-- Train model using gear_training.ipynb on Google collab
-- Test the model using gear_testing.ipynb on Google collab
-- (Optional) For ollama local use:
-  - Download the trained & merged model `hf download yrichard/gear_training-2026-04-28_13.15.01-merged --local-dir ./data/gear_merged`. Be careful, model needs not to be loaded with quantization in order to make it work
-  - Convert the model to Ollama gguf format `python ../llama.cpp/convert_hf_to_gguf.py ./gear_merged --outfile ./data/gear.gguf --outtype q8_0` (using llama.cpp `git clone https://github.com/ggerganov/llama.cpp.git`)
-  - Import the model into Ollama: `ollama create gear-assistant -f Modelfile`
-
-  ![Training](./data/wandb_training.png)
