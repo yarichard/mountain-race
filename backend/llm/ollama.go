@@ -18,6 +18,57 @@ func (p *ollamaProvider) ExtractEquipment(ctx context.Context, gearText, lang st
 	return ExtractEquipmentOllama(ctx, gearText, lang)
 }
 
+func (p *ollamaProvider) ParseRaceIntent(ctx context.Context, text, lang string) (*ParseIntentResult, error) {
+	return ParseRaceIntentOllama(ctx, text, lang)
+}
+
+func ParseRaceIntentOllama(ctx context.Context, text, lang string) (*ParseIntentResult, error) {
+	if text == "" {
+		return nil, fmt.Errorf("text is required")
+	}
+
+	ollamaCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	reqBody := ollamaChatRequest{
+		Model: ollamaModel(),
+		Messages: []ollamaChatMessage{
+			{Role: "system", Content: intentSystemPrompt(lang)},
+			{Role: "user", Content: intentUserPrompt(text, lang)},
+		},
+		Stream: false,
+		Options: map[string]any{
+			"num_predict": 1024,
+			"temperature": 0,
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req, err := http.NewRequestWithContext(ollamaCtx, http.MethodPost, ollamaURL()+"/api/chat", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("building ollama request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ollama unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ollama returned status %d", resp.StatusCode)
+	}
+
+	raw, _ := io.ReadAll(resp.Body)
+	var ollamaResp ollamaChatResponse
+	if err := json.Unmarshal(raw, &ollamaResp); err != nil {
+		return nil, fmt.Errorf("parsing ollama response: %w", err)
+	}
+
+	return parseIntentJSON(ollamaResp.Message.Content)
+}
+
 func ollamaURL() string {
 	if u := os.Getenv("OLLAMA_URL"); u != "" {
 		return u

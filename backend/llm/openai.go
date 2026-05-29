@@ -19,6 +19,10 @@ func (p *openaiProvider) ExtractEquipment(ctx context.Context, gearText, lang st
 	return ExtractEquipmentOpenAI(ctx, gearText, lang)
 }
 
+func (p *openaiProvider) ParseRaceIntent(ctx context.Context, text, lang string) (*ParseIntentResult, error) {
+	return ParseRaceIntentOpenAI(ctx, text, lang)
+}
+
 func openAIModel() string {
 	if m := os.Getenv("OPENAI_MODEL"); m != "" {
 		return m
@@ -42,6 +46,57 @@ type openAIChatResponse struct {
 	Choices []struct {
 		Message openAIChatMessage `json:"message"`
 	} `json:"choices"`
+}
+
+func ParseRaceIntentOpenAI(ctx context.Context, text, lang string) (*ParseIntentResult, error) {
+	if text == "" {
+		return nil, fmt.Errorf("text is required")
+	}
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("OPENAI_API_KEY not set")
+	}
+
+	reqBody := openAIChatRequest{
+		Model: openAIModel(),
+		Messages: []openAIChatMessage{
+			{Role: "system", Content: intentSystemPrompt(lang)},
+			{Role: "user", Content: intentUserPrompt(text, lang)},
+		},
+		Temperature: 0,
+		MaxTokens:   1024,
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, openAIBaseURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("building OpenAI request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("OpenAI returned status %d: %s", resp.StatusCode, raw)
+	}
+
+	raw, _ := io.ReadAll(resp.Body)
+	var openAIResp openAIChatResponse
+	if err := json.Unmarshal(raw, &openAIResp); err != nil {
+		return nil, fmt.Errorf("parsing OpenAI response: %w", err)
+	}
+	if len(openAIResp.Choices) == 0 {
+		return nil, fmt.Errorf("OpenAI returned no choices")
+	}
+
+	return parseIntentJSON(openAIResp.Choices[0].Message.Content)
 }
 
 func ExtractEquipmentOpenAI(ctx context.Context, gearText, lang string) ([]EquipmentItem, error) {
