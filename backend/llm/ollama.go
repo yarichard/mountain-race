@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -66,7 +67,7 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 		},
 		Stream: false,
 		Options: map[string]any{
-			"num_predict": 512,
+			"num_predict": 2048,
 			"temperature": 0,
 		},
 	}
@@ -93,9 +94,20 @@ func ExtractEquipmentOllama(ctx context.Context, gearText, lang string) ([]Equip
 		return nil, fmt.Errorf("parsing ollama response: %w", err)
 	}
 
-	match := jsonArrayRe.FindString(ollamaResp.Message.Content)
+	// Strip markdown code fences small models often emit (```json ... ```)
+	content := ollamaResp.Message.Content
+	if idx := strings.Index(content, "```"); idx != -1 {
+		content = content[idx:]
+		content = strings.TrimPrefix(content, "```json")
+		content = strings.TrimPrefix(content, "```")
+		if end := strings.Index(content, "```"); end != -1 {
+			content = content[:end]
+		}
+	}
+
+	match := jsonArrayRe.FindString(content)
 	if match == "" {
-		return nil, fmt.Errorf("no JSON array found in ollama response")
+		return nil, fmt.Errorf("no JSON array found in ollama response: %q", ollamaResp.Message.Content)
 	}
 
 	var items []EquipmentItem
