@@ -142,7 +142,8 @@ export default function Home() {
           disabled={!route || exporting}
           className="flex items-center gap-2 bg-white text-[var(--primary)] font-semibold text-sm px-4 py-1.5 rounded-full shadow hover:bg-blue-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          📄 {exporting ? t("export.exporting") : t("export.button")}
+          <span>📄</span>
+          <span className="hidden sm:inline">{exporting ? t("export.exporting") : t("export.button")}</span>
         </button>
       </header>
 
@@ -156,21 +157,7 @@ export default function Home() {
 
         Columns: 210px | 1fr | 270px
       */}
-      <main
-        className="flex-1 p-2 gap-2 overflow-hidden"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "210px 1fr 350px",
-          gridTemplateRows: "auto 1fr auto auto",
-          gridTemplateAreas: `
-            "p1  top-mid   p3"
-            "p9  p5        p6"
-            "p9  p5        p6"
-            ".   bot-mid   p6"
-          `,
-          minHeight: 0,
-        }}
-      >
+      <main className="main-grid flex-1 p-2 gap-2 overflow-hidden" style={{ minHeight: 0 }}>
         {/* Part 1: Participants — col 1, rows 1-3 */}
         <div style={{ gridArea: "p1" }} className="min-h-0">
           <ParticipantsPanel participants={participants} onChange={setParticipants} />
@@ -182,7 +169,7 @@ export default function Home() {
         </div>
 
         {/* Top-mid: Part 2 + Part 4 side-by-side */}
-        <div style={{ gridArea: "top-mid" }} className="grid grid-cols-[160px_1fr] gap-2 min-h-0">
+        <div style={{ gridArea: "top-mid" }} className="top-mid-grid min-h-0">
           <ObjectivesPanel
             objectives={objectives}
             notes={notes}
@@ -205,7 +192,7 @@ export default function Home() {
         </div>
 
         {/* Bottom-mid: Part 8 + Part 7 */}
-        <div style={{ gridArea: "bot-mid" }} className="grid grid-cols-2 gap-2 min-h-0">
+        <div style={{ gridArea: "bot-mid" }} className="bot-mid-grid min-h-0">
           <SchedulePanel route={route} />
           <AlternativesPanel route={route} />
         </div>
