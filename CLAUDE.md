@@ -60,7 +60,7 @@ In order to find a race that matches the user inputs, the backend should look fo
 ### Visual Design
 
 - **Mountain theme**: the theme should be inspired by the mountains, climbing, snow
-- **Responsive but desktop-first**: optimized for wide screens, functional on tablet
+- **Responsive**: desktop-first (≥ 1200px 3-column grid), 2-column on tablet (768–1199px), single-column stacked on mobile (< 768px)
 
 ### Color Scheme
 - The main colors are `#1F2782` (dark blue) and `#FFFFFF` (white), evoking the mountains
@@ -223,6 +223,8 @@ Layout:
 ```
 
 ### Technical Notes
+
+- **Responsive grid implementation**: The 9-panel layout is driven by three CSS classes in `frontend/src/app/globals.css`: `.main-grid` (outer 3-column grid), `.top-mid-grid` (Objectives + Search side-by-side), `.bot-mid-grid` (Schedule + Alternatives side-by-side). Each class carries `@media` overrides: tablet (768–1199px) collapses to 2 columns; mobile (< 768px) collapses to a single column with panels stacked in reading order (Search → Participants → Weather → Detail → Risks → Schedule/Alternatives → Equipment). The `page.tsx` `<main>` uses `className="main-grid"` — do not move these back to inline `style` props, as that would break the media queries. The export button label is hidden on small screens (`hidden sm:inline`) leaving only the icon.
 
 - **Weather forecast implementation**: `backend/meteo/forecast.go` calls Open-Meteo with a single GET request. For race dates within 4 days: `models=meteofrance_seamless`, `temperature_100m`. Beyond 4 days: no `models` param, `temperature_120m`. Always requests `wind_speed_10m` and `precipitation`. Returns a daily summary (min/max temp, total precipitation, max wind) plus 24 hourly points.
 - **Avalanche forecast implementation**: `backend/meteo/avalanche.go` calls MeteoFrance DPBRA using a Bearer token from `backend/meteo/token.go`. Steps: (1) `GET /liste-massifs` to get GeoJSON massif polygons; (2) point-in-polygon test to find the containing massif; (3) `GET /massif/BRA?id-massif=X&format=xml` to fetch the BRA XML and extract `RISQUEMAXI` for the target date. Returns `massif_id` and `massif_name` in the response. Falls back to a mock result (`risk_level=2`, no `massif_id`) when credentials are absent or the API is unreachable.
