@@ -101,10 +101,18 @@ function renderApp() {
   return render(<Home />);
 }
 
+const MOCK_EQUIPMENT = [
+  { item: "Corde 60m", quantity: 1, notes: "obligatoire" },
+  { item: "Dégaines", quantity: 12, notes: "obligatoire" },
+];
+
 type FetchOverrides = {
   searchRoutes?: unknown[];
   routeDetail?: unknown;
   weather?: unknown;
+  equipment?: unknown;
+  equipmentOk?: boolean;
+  exportOk?: boolean;
 };
 
 function mockFetch(overrides: FetchOverrides = {}) {
@@ -119,6 +127,19 @@ function mockFetch(overrides: FetchOverrides = {}) {
     }
     if (url.startsWith("/api/weather")) {
       return { ok: true, json: async () => overrides.weather ?? MOCK_WEATHER } as Response;
+    }
+    if (url === "/api/equipment/extract") {
+      const ok = overrides.equipmentOk ?? true;
+      if (!ok) return { ok: false, status: 500, json: async () => ({}) } as Response;
+      return { ok: true, json: async () => ({ equipment: overrides.equipment ?? MOCK_EQUIPMENT }) } as Response;
+    }
+    if (url === "/api/export/pdf") {
+      const ok = overrides.exportOk ?? true;
+      if (!ok) return { ok: false, status: 500 } as Response;
+      return {
+        ok: true,
+        blob: async () => new Blob(["PDF"], { type: "application/pdf" }),
+      } as Response;
     }
     return { ok: false, status: 404, json: async () => ({}) } as Response;
   });
@@ -343,5 +364,95 @@ describe("User flow: search and select a route", () => {
     await waitFor(() =>
       expect(screen.getByText("No routes found")).toBeInTheDocument()
     );
+  });
+
+  it("export button is disabled when no route is selected", () => {
+    mockFetch();
+    renderApp();
+    const exportBtn = screen.getByRole("button", { name: /📄/ });
+    expect(exportBtn).toBeDisabled();
+  });
+
+  it("export button triggers PDF download when a route is selected", async () => {
+    mockFetch();
+    renderApp();
+
+    // Select a route
+    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+    await waitFor(() => expect(screen.getByText("Arête des Cosmiques")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Arête des Cosmiques"));
+    await waitFor(() => expect(screen.getByText("Belle arête mixte au-dessus de Chamonix.")).toBeInTheDocument());
+
+    // Mock URL.createObjectURL / revokeObjectURL (not available in jsdom)
+    const createObjectURL = jest.fn().mockReturnValue("blob:fake-url");
+    const revokeObjectURL = jest.fn();
+    Object.defineProperty(window, "URL", {
+      value: { createObjectURL, revokeObjectURL },
+      writable: true,
+    });
+
+    // Mock anchor click
+    const clickSpy = jest.fn();
+    const anchorEl = { href: "", download: "", click: clickSpy } as unknown as HTMLAnchorElement;
+    jest.spyOn(document, "createElement").mockReturnValueOnce(anchorEl);
+
+    const exportBtn = screen.getByRole("button", { name: /📄/ });
+    expect(exportBtn).not.toBeDisabled();
+
+    fireEvent.click(exportBtn);
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalled());
+    expect(anchorEl.download).toBe("mountain-race.pdf");
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalled();
+  });
+
+  it("route selection with empty gear_text sets equipment to empty array without calling equipment API", async () => {
+    const fetchSpy = mockFetch({
+      routeDetail: { ...MOCK_ROUTE_DETAIL, gear_text: "" },
+    });
+    renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+    await waitFor(() => expect(screen.getByText("Arête des Cosmiques")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Arête des Cosmiques"));
+    await waitFor(() => expect(screen.getByText("Belle arête mixte au-dessus de Chamonix.")).toBeInTheDocument());
+
+    // No call to /api/equipment/extract when gear_text is empty
+    const equipCalls = fetchSpy.mock.calls.filter(
+      ([url]: [string]) => typeof url === "string" && url === "/api/equipment/extract"
+    );
+    expect(equipCalls).toHaveLength(0);
+  });
+
+  it("route selection with gear_text calls equipment API and receives items", async () => {
+    mockFetch({
+      routeDetail: { ...MOCK_ROUTE_DETAIL, gear_text: "1 corde 60m, 12 dégaines" },
+    });
+    renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+    await waitFor(() => expect(screen.getByText("Arête des Cosmiques")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Arête des Cosmiques"));
+    await waitFor(() => expect(screen.getByText("Belle arête mixte au-dessus de Chamonix.")).toBeInTheDocument());
+
+    // EquipmentPanel should render at least one item from the mock
+    await waitFor(() => expect(screen.getByText("Corde 60m")).toBeInTheDocument());
+  });
+
+  it("equipment API failure sets equipment to empty without crashing", async () => {
+    mockFetch({
+      routeDetail: { ...MOCK_ROUTE_DETAIL, gear_text: "1 corde 60m" },
+      equipmentOk: false,
+    });
+    renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+    await waitFor(() => expect(screen.getByText("Arête des Cosmiques")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Arête des Cosmiques"));
+    await waitFor(() => expect(screen.getByText("Belle arête mixte au-dessus de Chamonix.")).toBeInTheDocument());
+
+    // No crash; route detail still visible
+    expect(screen.getByText("Belle arête mixte au-dessus de Chamonix.")).toBeInTheDocument();
   });
 });
