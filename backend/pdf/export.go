@@ -19,6 +19,7 @@ import (
 
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
+	"mountain-race/meteo"
 )
 
 // Package-level vars so tests can override them with httptest.Server URLs.
@@ -80,6 +81,8 @@ type AvalancheData struct {
 	RiskLevel   int    `json:"risk_level"`
 	RiskLabel   string `json:"risk_label"`
 	Description string `json:"description"`
+	MassifID    int    `json:"massif_id"`
+	MassifName  string `json:"massif_name"`
 }
 
 // PlanData is the JSON body expected by POST /api/export/pdf.
@@ -105,11 +108,12 @@ type PlanData struct {
 	Objectives        []string           `json:"objectives"`
 	Notes             string             `json:"notes"`
 	// Computed (not from JSON)
-	GeneratedAt     string        `json:"-"`
-	DescriptionHTML template.HTML `json:"-"`
-	ImagesHTML      template.HTML `json:"-"`
-	ElevationSVG    template.HTML `json:"-"`
-	MapSVG          template.HTML `json:"-"`
+	GeneratedAt          string        `json:"-"`
+	DescriptionHTML      template.HTML `json:"-"`
+	ImagesHTML           template.HTML `json:"-"`
+	ElevationSVG         template.HTML `json:"-"`
+	MapSVG               template.HTML `json:"-"`
+	AvalancheImagesHTML  template.HTML `json:"-"`
 }
 
 // ── Markdown helper ───────────────────────────────────────────────────────────
@@ -154,6 +158,51 @@ func fetchImage(filename string) (string, error) {
 		ct = "image/jpeg"
 	}
 	return "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(data), nil
+}
+
+// buildAvalancheImagesHTML fetches the three DPBRA bulletin images for a massif
+// and returns an HTML fragment with base64-encoded data URIs.
+func buildAvalancheImagesHTML(massifID int) template.HTML {
+	if massifID <= 0 {
+		return ""
+	}
+	imageTypes := []string{"montagne-risques", "apercu-meteo", "sept-derniers-jours"}
+	results := make([]string, len(imageTypes))
+	var wg sync.WaitGroup
+	for i, imgType := range imageTypes {
+		wg.Add(1)
+		go func(idx int, t string) {
+			defer wg.Done()
+			var buf bytes.Buffer
+			ct, err := meteo.ProxyMassifImage(&buf, massifID, t)
+			if err != nil || buf.Len() == 0 {
+				return
+			}
+			if ct == "" {
+				ct = "image/png"
+			}
+			results[idx] = "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
+		}(i, imgType)
+	}
+	wg.Wait()
+
+	// max-height per image type keeps the large MeteoFrance maps from overwhelming the page
+	maxHeights := map[string]string{
+		"montagne-risques":  "160px",
+		"apercu-meteo":      "160px",
+		"sept-derniers-jours": "400px",
+	}
+
+	var sb strings.Builder
+	sb.WriteString(`<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">`)
+	for i, r := range results {
+		if r != "" {
+			h := maxHeights[imageTypes[i]]
+			fmt.Fprintf(&sb, `<img src="%s" alt="%s" style="max-height:%s;width:auto;border-radius:4px;object-fit:contain">`, r, imageTypes[i], h)
+		}
+	}
+	sb.WriteString(`</div>`)
+	return template.HTML(sb.String())
 }
 
 // buildImagesHTML fetches up to maxImages images in parallel and returns
@@ -398,35 +447,45 @@ func buildMapSVG(track [][2]float64, lat, lon float64) template.HTML {
 		return buildMapSVGFallback(points)
 	}
 
-	svgW := cols * tilePx
-	svgH := rows * tilePx
+	nativW := cols * tilePx
+	nativH := rows * tilePx
 
-	// project converts WGS84 lat/lon to pixel coordinates within the tile grid.
+	// Scale the tile grid to a fixed 185px display height.
+	const displayH = 185.0
+	scale := displayH / float64(nativH)
+	displayW := float64(nativW) * scale
+
+	// project converts WGS84 lat/lon to display-space pixel coordinates.
 	project := func(plat, plon float64) (float64, float64) {
 		n := math.Pow(2, float64(zoom))
-		px := (plon+180)/360*n*tilePx - float64(tx1)*tilePx
+		px := ((plon+180)/360*n*tilePx - float64(tx1)*tilePx) * scale
 		latRad := plat * math.Pi / 180
-		py := (1-math.Log(math.Tan(latRad)+1/math.Cos(latRad))/math.Pi)/2*n*tilePx - float64(ty1)*tilePx
+		py := ((1-math.Log(math.Tan(latRad)+1/math.Cos(latRad))/math.Pi)/2*n*tilePx - float64(ty1)*tilePx) * scale
 		return px, py
 	}
 
+	tileSz := float64(tilePx) * scale
+
+	// Use a positioned HTML div with <img> tiles (SVG <image> doesn't render
+	// reliably from file:// in headless Chromium) and an SVG overlay for the route.
 	var sb strings.Builder
-	// width:100%;height:auto scales proportionally to the container width.
-	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" style="height:185px;width:auto;max-width:100%%;display:block;border-radius:4px">`,
-		svgW, svgH)
+	fmt.Fprintf(&sb,
+		`<div style="position:relative;width:%.0fpx;height:%.0fpx;overflow:hidden;border-radius:4px;border:1px solid #aaa;background:#dce8f5">`,
+		displayW, displayH)
 
-	// Blue background in case some tiles are missing.
-	fmt.Fprintf(&sb, `<rect width="%d" height="%d" fill="#dce8f5"/>`, svgW, svgH)
-
-	// Tile images.
+	// Tile images via plain <img> tags.
 	for _, c := range fetched {
-		x := (c.tx - tx1) * tilePx
-		y := (c.ty - ty1) * tilePx
-		fmt.Fprintf(&sb, `<image x="%d" y="%d" width="%d" height="%d" href="%s"/>`,
-			x, y, tilePx, tilePx, c.data)
+		x := float64(c.tx-tx1) * tileSz
+		y := float64(c.ty-ty1) * tileSz
+		fmt.Fprintf(&sb,
+			`<img src="%s" style="position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;height:%.1fpx;display:block;border:none">`,
+			c.data, x, y, tileSz, tileSz)
 	}
 
-	// Route overlay.
+	// SVG overlay for the route polyline and markers.
+	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0;top:0;width:%.0fpx;height:%.0fpx">`,
+		displayW, displayH)
+
 	if len(points) >= 2 {
 		var ptsStr strings.Builder
 		for _, p := range points {
@@ -434,28 +493,24 @@ func buildMapSVG(track [][2]float64, lat, lon float64) template.HTML {
 			fmt.Fprintf(&ptsStr, "%.1f,%.1f ", px, py)
 		}
 		pts := ptsStr.String()
-		// Shadow for contrast against both light and dark tiles.
 		fmt.Fprintf(&sb, `<polyline points="%s" fill="none" stroke="black" stroke-opacity="0.35" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`, pts)
 		fmt.Fprintf(&sb, `<polyline points="%s" fill="none" stroke="#1F2782" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`, pts)
-		// Start marker (green dot).
 		sx, sy := project(points[0][0], points[0][1])
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="7" fill="white" stroke="#1F2782" stroke-width="2"/>`, sx, sy)
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="4" fill="#4caf50"/>`, sx, sy)
-		// End marker (red dot).
 		ex, ey := project(points[len(points)-1][0], points[len(points)-1][1])
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="7" fill="white" stroke="#1F2782" stroke-width="2"/>`, ex, ey)
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="4" fill="#f44336"/>`, ex, ey)
 	} else {
-		// Single-point pin.
 		px, py := project(points[0][0], points[0][1])
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="10" fill="#1F2782" stroke="white" stroke-width="3"/>`, px, py)
 		fmt.Fprintf(&sb, `<circle cx="%.1f" cy="%.1f" r="4" fill="white"/>`, px, py)
 	}
 
-	// Border.
-	fmt.Fprintf(&sb, `<rect width="%d" height="%d" fill="none" stroke="#aaa" stroke-width="1" rx="4"/>`, svgW, svgH)
-
+	// Border rect inside the SVG overlay.
+	fmt.Fprintf(&sb, `<rect width="%.0f" height="%.0f" fill="none" stroke="#aaa" stroke-width="1" rx="4"/>`, displayW, displayH)
 	sb.WriteString(`</svg>`)
+	sb.WriteString(`</div>`)
 	return template.HTML(sb.String())
 }
 
@@ -643,8 +698,8 @@ const exportTemplate = `<!DOCTYPE html>
         </div>
         {{if .Weather.Avalanche.RiskLevel}}
         <div>
-          <div style="font-size:7pt;color:#888">Risque avalanche</div>
-          <div class="risk-{{.Weather.Avalanche.RiskLevel}}">{{.Weather.Avalanche.RiskLabel}}</div>
+          <div style="font-size:7pt;color:#888">Risque avalanche{{if .Weather.Avalanche.MassifName}} — {{.Weather.Avalanche.MassifName}}{{end}}</div>
+          <div class="risk-{{.Weather.Avalanche.RiskLevel}}">{{.Weather.Avalanche.RiskLabel}} ({{.Weather.Avalanche.RiskLevel}}/5)</div>
           {{if .Weather.Avalanche.Description}}<div style="font-size:6.5pt;color:#555;margin-top:2px">{{.Weather.Avalanche.Description}}</div>{{end}}
         </div>
         {{end}}
@@ -682,9 +737,17 @@ const exportTemplate = `<!DOCTYPE html>
 </div>
 {{end}}
 
+<!-- ── Avalanche bulletin images (only when massif images available) ── -->
+{{if .AvalancheImagesHTML}}
+<div class="card" style="margin-bottom:8px">
+  <h2>Bulletin avalanche{{if .Weather.Avalanche.MassifName}} — {{.Weather.Avalanche.MassifName}}{{end}}</h2>
+  {{.AvalancheImagesHTML}}
+</div>
+{{end}}
+
 <!-- ── Photos (only when images available) ── -->
 {{if .ImagesHTML}}
-<div class="card" style="margin-bottom:8px">
+<div class="card" style="margin-bottom:8px;break-inside:avoid;page-break-inside:avoid">
   <h2>Photos</h2>
   <div class="photos">{{.ImagesHTML}}</div>
 </div>
@@ -748,6 +811,7 @@ func Generate(_ http.ResponseWriter, body []byte) ([]byte, error) {
 
 	// Fetch images in parallel before starting Chromium to stay within the 30s timeout.
 	plan.ImagesHTML = buildImagesHTML(plan.Images)
+	plan.AvalancheImagesHTML = buildAvalancheImagesHTML(plan.Weather.Avalanche.MassifID)
 
 	tmpl, err := template.New("pdf").Parse(exportTemplate)
 	if err != nil {

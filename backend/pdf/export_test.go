@@ -194,15 +194,15 @@ func TestBuildMapSVGWithTiles(t *testing.T) {
 	osmTileBase = tileSrv.URL
 	defer func() { osmTileBase = original }()
 
-	t.Run("tile fetch succeeds: SVG contains <image> elements", func(t *testing.T) {
+	t.Run("tile fetch succeeds: HTML contains <img> tiles and route overlay", func(t *testing.T) {
 		track := [][2]float64{
 			{45.8, 6.8},
 			{45.85, 6.85},
 			{45.9, 6.9},
 		}
 		result := string(buildMapSVG(track, 45.85, 6.85))
-		if !strings.Contains(result, "<image ") {
-			t.Errorf("expected <image> elements from tile fetch, got: %.200s", result)
+		if !strings.Contains(result, "<img ") {
+			t.Errorf("expected <img> tile elements, got: %.200s", result)
 		}
 		if !strings.Contains(result, "data:image/png;base64,") {
 			t.Error("expected base64-encoded tile PNG")
