@@ -21,9 +21,11 @@ type Equipment struct {
 
 // AlternativeRoute is a related route.
 type AlternativeRoute struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Reason string `json:"reason"`
+	ID              string `json:"id"`
+	Title           string `json:"title"`
+	Reason          string `json:"reason"`
+	Difficulty      string `json:"difficulty"`
+	DifficultyColor string `json:"difficulty_color"`
 }
 
 // Schedule holds timing information.
@@ -197,10 +199,13 @@ func parseAlternatives(m map[string]any, lang string) []AlternativeRoute {
 		if title == "" {
 			title = fallbackTitle
 		}
+		difficulty, diffColor := gradeFromDoc(rm, "", "")
 		alts = append(alts, AlternativeRoute{
-			ID:     id,
-			Title:  title,
-			Reason: fallbackReason,
+			ID:              id,
+			Title:           title,
+			Reason:          fallbackReason,
+			Difficulty:      difficulty,
+			DifficultyColor: diffColor,
 		})
 	}
 	return alts

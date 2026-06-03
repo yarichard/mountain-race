@@ -34,6 +34,8 @@ export interface AlternativeRoute {
   id: string;
   title: string;
   reason: string;
+  difficulty: string;
+  difficulty_color: string;
 }
 
 export interface Schedule {
