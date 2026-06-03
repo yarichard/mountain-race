@@ -5,9 +5,10 @@ import type { RouteDetail } from "@/lib/types";
 
 interface Props {
   route: RouteDetail | null;
+  onSelectRoute?: (id: string) => void;
 }
 
-export function AlternativesPanel({ route }: Props) {
+export function AlternativesPanel({ route, onSelectRoute }: Props) {
   const t = useTranslations("alternatives");
 
   if (!route) {
@@ -29,18 +30,12 @@ export function AlternativesPanel({ route }: Props) {
           <p className="text-sm text-[var(--text-muted)]">{t("empty")}</p>
         ) : (
           route.alternative_routes.map((alt) => (
-            <div key={alt.id} className="border border-[var(--border)] rounded p-2">
-              <div className="flex justify-between items-start gap-2">
-                <p className="text-sm font-medium">{alt.title}</p>
-                <a
-                  href={`https://www.camptocamp.org/routes/${alt.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 text-xs text-[var(--primary)] hover:underline"
-                >
-                  {t("viewOnC2C")} ↗
-                </a>
-              </div>
+            <div
+              key={alt.id}
+              className="border border-[var(--border)] rounded p-2 hover:border-[var(--primary)] hover:bg-[var(--surface-alt)] cursor-pointer transition"
+              onClick={() => onSelectRoute?.(String(alt.id))}
+            >
+              <p className="text-sm font-medium">{alt.title}</p>
               {alt.reason && (
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">{alt.reason}</p>
               )}

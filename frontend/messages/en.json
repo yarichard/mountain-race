@@ -95,7 +95,8 @@
   "alternatives": {
     "title": "Alternative routes",
     "empty": "No alternative routes",
-    "viewOnC2C": "View"
+    "viewOnC2C": "View",
+    "select": "Select"
   },
   "schedule": {
     "title": "Schedule",

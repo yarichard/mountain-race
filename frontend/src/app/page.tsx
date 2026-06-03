@@ -29,6 +29,7 @@ export default function Home() {
   const [loadingWeather, setLoadingWeather] = useState(false);
   const [weatherError, setWeatherError] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [searchDate, setSearchDate] = useState(new Date().toISOString().split("T")[0]);
   // true initially so the first route selection always fetches weather
   const weatherStale = useRef(true);
 
@@ -181,7 +182,7 @@ export default function Home() {
             onRouteSelected={handleRouteSelected}
             onWeatherInvalidated={handleWeatherInvalidated}
             objectives={objectives}
-            onDateChange={(date) => handleDateChange(date, route)}
+            onDateChange={(date) => { setSearchDate(date); handleDateChange(date, route); }}
             onParticipantsFromIntent={(p) => setParticipants(p)}
           />
         </div>
@@ -194,7 +195,7 @@ export default function Home() {
         {/* Bottom-mid: Part 8 + Part 7 */}
         <div style={{ gridArea: "bot-mid" }} className="bot-mid-grid min-h-0">
           <SchedulePanel route={route} />
-          <AlternativesPanel route={route} />
+          <AlternativesPanel route={route} onSelectRoute={(id) => handleRouteSelected(id, searchDate)} />
         </div>
 
         {/* Part 3: Weather — col 3, row 1 */}
