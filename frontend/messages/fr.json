@@ -95,7 +95,8 @@
   "alternatives": {
     "title": "Itinéraires alternatifs",
     "empty": "Aucun itinéraire alternatif",
-    "viewOnC2C": "Voir"
+    "viewOnC2C": "Voir",
+    "select": "Sélectionner"
   },
   "schedule": {
     "title": "Horaire",
