@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -39,7 +40,10 @@ func GetWeather(c *gin.Context) {
 		return
 	}
 
-	avalanche, _ := meteo.AvalancheForecast(lat, lon, date)
+	avalanche, err := meteo.AvalancheForecast(lat, lon, date)
+	if err != nil {
+		log.Printf("Warning: failed to fetch avalanche forecast: %v", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"forecast":  forecast,
