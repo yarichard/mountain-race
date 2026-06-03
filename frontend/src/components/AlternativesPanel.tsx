@@ -3,6 +3,12 @@
 import { useTranslations } from "next-intl";
 import type { RouteDetail } from "@/lib/types";
 
+function badgeClass(color: string): string {
+  if (color === "green") return "bg-green-600 text-white";
+  if (color === "red") return "bg-red-600 text-white";
+  return "bg-[var(--primary)] text-white";
+}
+
 interface Props {
   route: RouteDetail | null;
   onSelectRoute?: (id: string) => void;
@@ -35,7 +41,14 @@ export function AlternativesPanel({ route, onSelectRoute }: Props) {
               className="border border-[var(--border)] rounded p-2 hover:border-[var(--primary)] hover:bg-[var(--surface-alt)] cursor-pointer transition"
               onClick={() => onSelectRoute?.(String(alt.id))}
             >
-              <p className="text-sm font-medium">{alt.title}</p>
+              <div className="flex justify-between items-start gap-2">
+                <p className="text-sm font-medium leading-tight flex-1">{alt.title}</p>
+                {alt.difficulty && (
+                  <span className={`shrink-0 text-xs font-bold rounded px-1.5 py-0.5 ${badgeClass(alt.difficulty_color)}`}>
+                    {alt.difficulty}
+                  </span>
+                )}
+              </div>
               {alt.reason && (
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">{alt.reason}</p>
               )}
