@@ -9,8 +9,8 @@ export interface RouteResult {
   summary: string;
   difficulty: string;
   difficulty_color: string;
-  elevation_gain: number;
-  distance_km: number;
+  height_diff_up: number;
+  height_diff_down: number;
   source_url: string;
 }
 
