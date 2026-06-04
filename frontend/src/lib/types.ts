@@ -42,7 +42,7 @@ export interface Schedule {
   estimated_duration_hours: number;
   recommended_start_time: string;
   recommended_end_time: string;
-  source: "camptocamp" | "formula";
+  source: "camptocamp" | "formula" | "llm";
 }
 
 export interface RouteDetail {

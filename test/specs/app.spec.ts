@@ -2,6 +2,63 @@ import { test, expect } from "@playwright/test";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:8003";
 
+// A date that is always ~30 days in the future, ensuring Open-Meteo serves it.
+function futureDateStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 10);
+  return d.toISOString().split("T")[0];
+}
+
+// Minimal mock route returned by the search endpoint.
+const MOCK_ROUTES = {
+  routes: [
+    {
+      id: "123456",
+      title: "Arête des Cosmiques",
+      summary: "Belle arête classique.",
+      difficulty: "AD",
+      difficulty_color: "green",
+      elevation_gain: 650,
+      distance_km: 4.2,
+      source_url: "https://www.camptocamp.org/routes/123456",
+    },
+  ],
+};
+
+// Minimal mock route detail returned by GET /api/routes/:id.
+const MOCK_DETAIL = {
+  id: "123456",
+  title: "Arête des Cosmiques",
+  description: "**L1** Première longueur en 4c\n**L2** Deuxième longueur en 5c",
+  difficulty: "AD",
+  elevation_gain: 650,
+  height_diff_down: 500,
+  lat: 45.87,
+  lon: 6.88,
+  track: [[45.85, 6.85], [45.87, 6.87], [45.89, 6.89]],
+  elevation_profile: [[0, 1000], [1, 1200], [2, 1450]],
+  images: [],
+  gpx_url: "",
+  gear_text: "Corde 60m, 12 dégaines",
+  risks: ["Risque de chute de pierres"],
+  alternative_routes: [
+    {
+      id: "789",
+      title: "Voie normale",
+      reason: "Repli en cas de mauvais temps",
+      difficulty: "F",
+      difficulty_color: "green",
+    },
+  ],
+  schedule: {
+    estimated_duration_hours: 6,
+    recommended_start_time: "06:00",
+    recommended_end_time: "14:00",
+    source: "formula",
+  },
+  source_url: "https://www.camptocamp.org/routes/123456",
+};
+
 test.describe("Mountain Race — E2E", () => {
   test("Page load: all 9 panels visible", async ({ page }) => {
     await page.goto(BASE);
@@ -39,8 +96,16 @@ test.describe("Mountain Race — E2E", () => {
   });
 
   test("Route search success: results list renders", async ({ page }) => {
+    // Mock the search API to avoid real CampToCamp calls.
+    await page.route("**/api/routes/search", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ROUTES),
+      });
+    });
+
     await page.goto(BASE);
-    // The location input placeholder in name mode is "e.g. Aiguille du Midi"
     const locationInput = page.locator('input[placeholder*="Aiguille"], input[placeholder*="Chamonix"]');
     await locationInput.fill("Chamonix");
     const searchBtn = page.locator("button", { hasText: /Rechercher|^Search$/ });
@@ -51,8 +116,43 @@ test.describe("Mountain Race — E2E", () => {
   });
 
   test("Route selection: detail panel fills in", async ({ page }) => {
+    // Mock both search and detail APIs.
+    await page.route("**/api/routes/search", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ROUTES),
+      });
+    });
+    await page.route("**/api/routes/123456", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_DETAIL),
+      });
+    });
+    // Mock equipment extraction to avoid LLM calls.
+    await page.route("**/api/equipment/extract", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ equipment: [{ item: "Corde 60m", quantity: 1, notes: "obligatoire" }] }),
+      });
+    });
+    // Mock weather to avoid external API calls.
+    await page.route("**/api/weather**", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          forecast: { date: futureDateStr(), temperature_min_c: 5, temperature_max_c: 15, precipitation_mm: 0, wind_speed_kmh: 20, condition: "sunny" },
+          avalanche: { risk_level: 2, risk_label: "Limité", description: "" },
+          hourly: [],
+        }),
+      });
+    });
+
     await page.goto(BASE);
-    // Fill location and search
     const locationInput = page.locator('input[placeholder*="Aiguille"], input[placeholder*="Chamonix"]');
     await locationInput.fill("Chamonix");
     const searchBtn = page.locator("button", { hasText: /Rechercher|^Search$/ });
@@ -77,7 +177,9 @@ test.describe("Mountain Race — E2E", () => {
   });
 
   test("Weather API: returns forecast and avalanche", async ({ page }) => {
-    const res = await page.request.get(`${BASE}/api/weather?lat=45.9&lon=6.9&date=2026-05-01`);
+    // Use a date 10 days in the future so Open-Meteo serves forecast data.
+    const date = futureDateStr();
+    const res = await page.request.get(`${BASE}/api/weather?lat=45.9&lon=6.9&date=${date}`);
     expect(res.status()).toBe(200);
     const data = await res.json();
     expect(data).toHaveProperty("forecast");
@@ -114,7 +216,7 @@ test.describe("Mountain Race — E2E", () => {
       ],
       risks: ["Risque de chute de pierres", "Conditions météo variables"],
       alternative_routes: [
-        { id: "789", title: "Voie normale", reason: "Repli en cas de mauvais temps" },
+        { id: "789", title: "Voie normale", reason: "Repli en cas de mauvais temps", difficulty: "F", difficulty_color: "green" },
       ],
       schedule: {
         estimated_duration_hours: 6,
