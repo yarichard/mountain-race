@@ -9,6 +9,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"mountain-race/llm"
+	"mountain-race/schedule"
 )
 
 
@@ -28,12 +31,19 @@ type AlternativeRoute struct {
 	DifficultyColor string `json:"difficulty_color"`
 }
 
+// DurationStep is one named stage found in an LLM-parsed description.
+type DurationStep struct {
+	Label string  `json:"label"`
+	Hours float64 `json:"hours"`
+}
+
 // Schedule holds timing information.
 type Schedule struct {
-	EstimatedDurationHours float64 `json:"estimated_duration_hours"`
-	RecommendedStartTime   string  `json:"recommended_start_time"`
-	RecommendedEndTime     string  `json:"recommended_end_time"`
-	Source                 string  `json:"source"` // "camptocamp" | "formula"
+	EstimatedDurationHours float64        `json:"estimated_duration_hours"`
+	RecommendedStartTime   string         `json:"recommended_start_time"`
+	RecommendedEndTime     string         `json:"recommended_end_time"`
+	Source                 string         `json:"source"` // "camptocamp" | "formula" | "llm"
+	Steps                  []DurationStep `json:"steps,omitempty"`
 }
 
 // RouteDetail is the full route information.
@@ -102,8 +112,8 @@ func GetDetail(ctx context.Context, id, lang string) (*RouteDetail, error) {
 	track := parseTrack(data)
 	elevProfile := fetchElevationProfile(ctx, track)
 
-	// Schedule: check if C2C has duration data in comments/description
-	sched := parseSchedule(data, float64(elevGain))
+	// Schedule: T1 (C2C) → T2 (Naismith+track) → T3 (LLM)
+	sched := parseSchedule(ctx, description, lang, data, float64(elevGain), float64(elevDown), track)
 
 	// Images and GPX
 	images := allImageFilenames(data)
@@ -211,36 +221,50 @@ func parseAlternatives(m map[string]any, lang string) []AlternativeRoute {
 	return alts
 }
 
-func parseSchedule(m map[string]any, elevGainM float64) Schedule {
-	// Look for duration in locales
-	locales, _ := m["locales"].([]any)
-	for _, l := range locales {
-		lm, ok := l.(map[string]any)
-		if !ok {
-			continue
-		}
-		if d, ok := lm["time_required"].(string); ok && d != "" {
-			return Schedule{
-				EstimatedDurationHours: 6,
-				RecommendedStartTime:   "06:00",
-				RecommendedEndTime:     "16:00",
-				Source:                 "camptocamp",
-			}
-		}
+// parseSchedule attempts T1 (C2C calculated_duration) then T2 (Naismith with track).
+// Returns a zero-value Schedule with empty Source when both fail, signalling the caller to try LLM.
+func parseSchedule(ctx context.Context, description string,  lang string, m map[string]any, elevGainM, elevDownM float64, track [][2]float64) Schedule {
+	// T1: C2C calculated_duration (stored in days)
+	if cd := floatField(m, "calculated_duration"); cd > 0 {
+		hours := math.Round(cd*24*10) / 10
+		return scheduleFromHours(hours, "camptocamp", nil)
 	}
 
-	// Naismith fallback: elevation only
-	duration := elevGainM / 600.0
-	if duration < 1 {
-		duration = 4
+	// T2: Naismith using track distance + elevation
+	if len(track) >= 2 {
+		var distKm float64
+		for i := 1; i < len(track); i++ {
+			distKm += haversineKm(track[i-1], track[i])
+		}
+		hours := math.Round(schedule.Naismith(distKm, elevGainM, elevDownM)*10) / 10
+		return scheduleFromHours(hours, "formula", nil)
 	}
-	endHour := min(6+int(duration), 20)
 
+	// T3: LLM parsing (handled by caller)
+	if dur, err := llm.NewProvider().ParseDuration(ctx, description, lang); err == nil && dur.TotalHours > 0 {
+		steps := make([]DurationStep, len(dur.Steps))
+		for i, s := range dur.Steps {
+			steps[i] = DurationStep{Label: s.Label, Hours: s.Hours}
+		}
+		return scheduleFromHours(dur.TotalHours, "llm", steps)
+	}
+
+	// Last resort: elevation-only estimate
+	hours := math.Round(float64(elevGainM)/600.0*10) / 10
+	return scheduleFromHours(hours, "formula", nil)
+}
+
+func scheduleFromHours(hours float64, source string, steps []DurationStep) Schedule {
+	if hours <= 0 {
+		hours = 4
+	}
+	endHour := min(6+int(math.Round(hours)), 20)
 	return Schedule{
-		EstimatedDurationHours: duration,
+		EstimatedDurationHours: hours,
 		RecommendedStartTime:   "06:00",
 		RecommendedEndTime:     fmt.Sprintf("%02d:00", endHour),
-		Source:                 "formula",
+		Source:                 source,
+		Steps:                  steps,
 	}
 }
 

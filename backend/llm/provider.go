@@ -9,6 +9,7 @@ import (
 type Provider interface {
 	ExtractEquipment(ctx context.Context, gearText, lang string) ([]EquipmentItem, error)
 	ParseRaceIntent(ctx context.Context, text, lang string) (*ParseIntentResult, error)
+	ParseDuration(ctx context.Context, description, lang string) (*DurationResult, error)
 }
 
 // NewProvider returns the Provider selected by the LLM_PROVIDER env var.

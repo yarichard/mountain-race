@@ -142,3 +142,58 @@ Règles :
 func equipmentUserPrompt(gearText string) string {
 	return "Description du matériel :\n" + gearText
 }
+
+// DurationStep is one named stage found in the description.
+type DurationStep struct {
+	Label string  `json:"label"`
+	Hours float64 `json:"hours"`
+}
+
+// DurationResult is the structured output from LLM duration parsing.
+type DurationResult struct {
+	TotalHours float64        `json:"total_hours"`
+	Confidence string         `json:"confidence"`
+	Steps      []DurationStep `json:"steps"`
+}
+
+func parseDurationJSON(raw string) (*DurationResult, error) {
+	match := jsonObjectRe.FindString(raw)
+	if match == "" {
+		return nil, fmt.Errorf("no JSON object found in LLM response")
+	}
+	var result DurationResult
+	if err := json.Unmarshal([]byte(match), &result); err != nil {
+		return nil, fmt.Errorf("parsing duration JSON: %w", err)
+	}
+	return &result, nil
+}
+
+func durationSystemPrompt(lang string) string {
+	if lang == "en" {
+		return `You are a mountain route planning assistant. Read the route description and extract timing information.
+Return a JSON object with exactly these fields:
+- "total_hours": total estimated duration in hours as a float (0 if not found)
+- "confidence": "high" if a clear total is stated, "medium" if computed from steps, "low" if estimated
+- "steps": array of {"label": "stage name", "hours": N} for any named stages/pitches/sections that mention a duration
+
+Reply ONLY with a valid JSON object. No text before or after.
+
+Example: {"total_hours": 7.5, "confidence": "medium", "steps": [{"label": "Approach", "hours": 1.5}, {"label": "Climb", "hours": 4}, {"label": "Descent", "hours": 2}]}`
+	}
+	return `Tu es un assistant de planification de courses en montagne. Lis la description de la course et extrais les informations de durée.
+Retourne un objet JSON avec exactement ces champs :
+- "total_hours" : durée totale estimée en heures (float), 0 si introuvable
+- "confidence" : "high" si une durée totale est clairement indiquée, "medium" si calculée depuis des étapes, "low" si estimée
+- "steps" : tableau de {"label": "nom de l'étape", "hours": N} pour chaque étape/longueur/section qui mentionne une durée
+
+Réponds UNIQUEMENT avec un objet JSON valide. Aucun texte avant ou après.
+
+Exemple : {"total_hours": 7.5, "confidence": "medium", "steps": [{"label": "Approche", "hours": 1.5}, {"label": "Escalade", "hours": 4}, {"label": "Descente", "hours": 2}]}`
+}
+
+func durationUserPrompt(description, lang string) string {
+	if lang == "en" {
+		return "Route description:\n" + description
+	}
+	return "Description de la course :\n" + description
+}
