@@ -23,6 +23,50 @@ func (p *openaiProvider) ParseRaceIntent(ctx context.Context, text, lang string)
 	return ParseRaceIntentOpenAI(ctx, text, lang)
 }
 
+func (p *openaiProvider) ParseDuration(ctx context.Context, description, lang string) (*DurationResult, error) {
+	if description == "" {
+		return nil, fmt.Errorf("description is required")
+	}
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("OPENAI_API_KEY not set")
+	}
+	reqBody := openAIChatRequest{
+		Model: openAIModel(),
+		Messages: []openAIChatMessage{
+			{Role: "system", Content: durationSystemPrompt(lang)},
+			{Role: "user", Content: durationUserPrompt(description, lang)},
+		},
+		Temperature: 0,
+		MaxTokens:   512,
+	}
+	body, _ := json.Marshal(reqBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, openAIBaseURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("building OpenAI request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("OpenAI returned status %d: %s", resp.StatusCode, raw)
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	var openAIResp openAIChatResponse
+	if err := json.Unmarshal(raw, &openAIResp); err != nil {
+		return nil, fmt.Errorf("parsing OpenAI response: %w", err)
+	}
+	if len(openAIResp.Choices) == 0 {
+		return nil, fmt.Errorf("OpenAI returned no choices")
+	}
+	return parseDurationJSON(openAIResp.Choices[0].Message.Content)
+}
+
 func openAIModel() string {
 	if m := os.Getenv("OPENAI_MODEL"); m != "" {
 		return m
