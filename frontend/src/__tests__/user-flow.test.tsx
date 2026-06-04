@@ -57,7 +57,7 @@ const MOCK_ROUTE_DETAIL = {
   title: "Arête des Cosmiques",
   description: "Belle arête mixte au-dessus de Chamonix.",
   difficulty: "AD",
-  elevation_gain: 300,
+  height_diff_up: 300,
   height_diff_down: 280,
   lat: 45.87,
   lon: 6.88,
@@ -184,7 +184,7 @@ describe("User flow: search and select a route", () => {
       expect(screen.getByText("Arête des Cosmiques")).toBeInTheDocument()
     );
     expect(screen.getByText("↑300m")).toBeInTheDocument();
-    expect(screen.getByText("2.5km")).toBeInTheDocument();
+    expect(screen.getByText("↓250m")).toBeInTheDocument();
   });
 
   it("shows loading spinner in detail panel while fetching route", async () => {
