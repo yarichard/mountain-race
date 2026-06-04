@@ -47,8 +47,8 @@ const MOCK_ROUTE_RESULT = {
   title: "Arête des Cosmiques",
   summary: "Classique du Mont-Blanc",
   difficulty: "AD",
-  elevation_gain: 300,
-  distance_km: 2.5,
+  height_diff_up: 300,
+  height_diff_down: 250,
   source_url: "https://www.camptocamp.org/routes/789",
 };
 

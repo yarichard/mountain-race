@@ -411,9 +411,9 @@ export function SearchPanel({
                       </span>
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                      <span className="text-green-600">↑{r.elevation_gain}m</span>
+                      <span className="text-green-600">↑{r.height_diff_up}m</span>
                       {" · "}
-                      <span>{r.distance_km}km</span>
+                      <span className="text-red-500">↓{r.height_diff_down}m</span>
                     </p>
                   </div>
                 ))}
