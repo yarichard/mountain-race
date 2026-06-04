@@ -6,7 +6,9 @@
       "Bash(python .claude/skills/gear-crawler/scripts/enrich_gear.py ./data/gear_dataset_improved.jsonl)",
       "Bash(go test *)",
       "Bash(go tool *)",
-      "Bash(npx jest *)"
+      "Bash(npx jest *)",
+      "Bash(BASE_URL=http://localhost:8003 npx playwright test *",
+      "Bash(npx tsc *)"
     ]
   }
 }
